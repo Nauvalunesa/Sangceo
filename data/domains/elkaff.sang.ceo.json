@@ -4,5 +4,13 @@
  "owner": "elkhaff",
  "records": {
   "CNAME": "62873a1b0171cbc0.vercel-dns-017.com"
- }
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=elkaff.sang.ceo,46fd4513a4a4bff65b6b",
+      "at": "apex"
+    }
+  ]
 }
