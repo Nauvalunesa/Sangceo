@@ -1,0 +1,16 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "xlawxd",
+  "owner": "XLawXD0",
+  "records": {
+    "CNAME": "dc5624d49a0b7af7.vercel-dns-017.com."
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=xlawxd.sang.ceo,ce55b580a3554c20627f",
+      "at": "apex"
+    }
+  ]
+}

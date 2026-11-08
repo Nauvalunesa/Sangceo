@@ -1,0 +1,16 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "irfan",
+  "owner": "rtwone",
+  "records": {
+    "CNAME": "ad42007bbf26e019.vercel-dns-017.com"
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=irfan.sang.ceo,f5074975de06cb58058b",
+      "at": "apex"
+    }
+  ]
+}

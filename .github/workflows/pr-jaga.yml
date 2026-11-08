@@ -1,0 +1,33 @@
+name: Penjaga PR
+
+# Lapisan ketiga: memeriksa seluruh PR terbuka secara berkala, jadi tidak bergantung
+# pada run workflow dari fork (yang butuh persetujuan untuk akun baru ke GitHub).
+on:
+  schedule:
+    - cron: "*/3 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: penjaga-pr
+  cancel-in-progress: false
+
+jobs:
+  jaga:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Periksa dan bereskan PR terbuka
+        env:
+          GH_TOKEN: ${{ secrets.BOT_TOKEN }}
+          PEMILIK_REPO: ${{ github.repository_owner }}
+        run: bash scripts/jaga-pr.sh
