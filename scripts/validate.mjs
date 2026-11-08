@@ -78,7 +78,7 @@ for (const file of changed) {
   }
 
   if (rel.startsWith("data/domains/")) {
-    const { domain, subdomain, owner, records } = data;
+    const { domain, subdomain, owner, records, extra } = data;
     if (domain !== ZONE) errors.push(`\`${rel}\`: \`domain\` harus \`${ZONE}\``);
     if (!subdomain || !NAME_RE.test(subdomain))
       errors.push(`\`${rel}\`: \`subdomain\` tidak valid (huruf kecil, angka, tanda hubung)`);
@@ -92,6 +92,25 @@ for (const file of changed) {
         errors.push(`\`${rel}\`: CNAME harus berupa string tunggal`);
       if (String(records.CNAME).toLowerCase().startsWith(`${subdomain}.${ZONE}`))
         errors.push(`\`${rel}\`: CNAME tidak boleh menunjuk ke namanya sendiri`);
+    }
+    // record tambahan untuk verifikasi penyedia hosting (Vercel, GitHub Pages, Netlify, dsb).
+    // Namanya label relatif di bawah subdomain sendiri, mis. "_vercel" -> _vercel.elkaff.sang.ceo
+    if (extra !== undefined) {
+      if (!Array.isArray(extra) || extra.length > 10) {
+        errors.push(`\`${rel}\`: \`extra\` harus berupa array maksimal 10 record`);
+      } else {
+        const LABEL_RE = /^_?[a-z0-9][a-z0-9-]{0,62}$/;
+        extra.forEach((x, i) => {
+          const at = `\`${rel}\`: \`extra[${i}]\``;
+          if (!x || typeof x !== "object") return errors.push(`${at} harus objek {type,name,value}`);
+          if (x.type !== "TXT")
+            errors.push(`${at}: hanya \`type: "TXT"\` yang didukung untuk verifikasi`);
+          if (!x.name || !LABEL_RE.test(x.name))
+            errors.push(`${at}: \`name\` harus satu label huruf kecil/angka/tanda hubung, boleh diawali \`_\``);
+          if (typeof x.value !== "string" || x.value.length === 0 || x.value.length > 500 || /[\r\n]/.test(x.value))
+            errors.push(`${at}: \`value\` harus string 1-500 karakter tanpa baris baru`);
+        });
+      }
     }
     if (!errors.some((e) => e.startsWith(`\`${rel}\``))) {
       const rec = Object.entries(records || {})

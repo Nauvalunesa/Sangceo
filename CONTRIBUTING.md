@@ -21,6 +21,27 @@ Buat `data/domains/<nama>.sang.ceo.json`:
 - Untuk A/AAAA, isi IP. Untuk record lain, isi target FQDN.
 - Tidak ada record A/AAAA ke IP privat atau loopback.
 
+### Record verifikasi tambahan
+
+Kalau platform hosting minta TXT verifikasi (Vercel, GitHub Pages, Netlify), tambahkan
+field `extra` di file yang **sudah kamu klaim** — bukan klaim subdomain baru:
+
+```json
+{
+  "domain": "sang.ceo",
+  "subdomain": "nama",
+  "owner": "username-github-mu",
+  "records": { "CNAME": "cname.vercel-dns.com" },
+  "extra": [
+    { "type": "TXT", "name": "_vercel", "value": "vc-domain-verify=nama.sang.ceo,abc123" }
+  ]
+}
+```
+
+- `name` satu label di bawah subdomainmu: `_vercel` menjadi `_vercel.nama.sang.ceo`.
+- Hanya `type: "TXT"`, maksimal 10 record, nilai maksimal 500 karakter.
+- Perubahan pada file yang sudah ada juga lewat PR (bukan push langsung).
+
 ## Mailbox
 
 Buat `data/emails/<alamat>.json`:
