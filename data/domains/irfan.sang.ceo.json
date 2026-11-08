@@ -1,4 +1,4 @@
-{"domain":"sang.ceo","subdomain":"irfan","owner":"rtwone","records":{"CNAME":"{
+{
   "domain": "sang.ceo",
   "subdomain": "irfan",
   "owner": "rtwone",
@@ -12,4 +12,4 @@
       "value": "vc-domain-verify=irfan.sang.ceo,f5074975de06cb58058b"
     }
   ]
-}"}}
+}
