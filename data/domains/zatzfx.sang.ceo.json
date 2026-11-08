@@ -1,0 +1,9 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "zatzfx",
+  "owner": "zatzfx",
+  "description": "Holla👋",
+  "records": {
+    "CNAME": "b302d712dc020f35.vercel-dns-017.com"
+  }
+}
