@@ -5,8 +5,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 jobs:
   validate:
@@ -25,43 +23,15 @@ jobs:
         id: val
         continue-on-error: true
         run: node scripts/validate.mjs "${{ steps.base.outputs.sha }}" 2>&1 | tee validate.log; test ${PIPESTATUS[0]} -eq 0
-      - name: Komentar di PR
-        uses: actions/github-script@v7
-        continue-on-error: true
+      # PR dari fork tidak menerima secrets, jadi komentar dan penutupan PR dikerjakan
+      # workflow terpisah (pr-feedback.yml) yang membaca hasil ini lewat artifact.
+      - name: Simpan hasil validasi
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          # Token bawaan read-only untuk PR dari fork; pakai PAT agar bot bisa berkomentar.
-          github-token: ${{ secrets.BOT_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const log = fs.readFileSync('validate.log', 'utf8');
-            const ok = log.includes('lolos validasi');
-            const i = log.indexOf('###');
-            const body = ok ? (i === -1 ? log : log.slice(i)) : log;
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body.slice(0, 60000) || 'Validasi tidak menghasilkan keluaran.',
-            });
+          name: validate-log
+          path: validate.log
+          if-no-files-found: error
       - name: Gagal bila validasi gagal
         if: steps.val.outcome == 'failure'
         run: exit 1
-      - name: Tolak otomatis (tutup PR)
-        if: failure() && steps.val.outcome == 'failure'
-        uses: actions/github-script@v7
-        continue-on-error: true
-        with:
-          github-token: ${{ secrets.BOT_TOKEN }}
-          script: |
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: 'Validasi gagal, jadi PR ini ditutup otomatis. Perbaiki file sesuai catatan di atas, lalu buka PR baru. Perubahan tidak akan pernah aktif lewat PR ini.'
-            });
-            await github.rest.pulls.update({
-              pull_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'closed'
-            });

@@ -41,6 +41,7 @@ const existing = {
 
 const errors = [];
 const previews = [];
+const notes = [];
 
 for (const file of misplaced) {
   errors.push(
@@ -111,6 +112,16 @@ for (const file of changed) {
             errors.push(`${at}: \`name\` harus satu label huruf kecil/angka/tanda hubung, boleh diawali \`_\``);
           if (typeof x.value !== "string" || x.value.length === 0 || x.value.length > 500 || /[\r\n]/.test(x.value))
             errors.push(`${at}: \`value\` harus string 1-500 karakter tanpa baris baru`);
+          // Vercel punya dua alur. Kalau subdomain masih di akun Vercel sendiri, TXT
+          // diletakkan di bawah subdomain. Kalau tertaut ke akun Vercel lain, Vercel
+          // meminta record di level zona, dan itu harus ditulis `at: "apex"`.
+          if (x.at !== "apex" && /^vc-domain-verify=[a-z0-9.-]+,[a-z0-9]+$/i.test(String(x.value))) {
+            notes.push(
+              `${at}: nilai \`vc-domain-verify=\` ditaruh di bawah subdomain (\`${x.name}.${subdomain}.${ZONE}\`). ` +
+                `Kalau dashboard Vercel menulis "This domain is linked to another Vercel account" dan meminta \`_vercel.${ZONE}\`, ` +
+                `tambahkan \`"at": "apex"\` pada record itu.`
+            );
+          }
           if (x.at === "apex") {
             // Record level zona hanya untuk verifikasi kepemilikan subdomain lewat Vercel.
             // Tanpa batas ini, siapa pun bisa memverifikasi kepemilikan zona sang.ceo itu sendiri.
@@ -163,6 +174,10 @@ if (previews.length > 0) {
       : "### Pratinjau klaim subdomain\n\n| Subdomain | Pemilik | Deskripsi | Record |\n|---|---|---|---|\n" +
           previews.join("\n")
   );
+}
+
+if (notes.length > 0) {
+  console.log("### Catatan\n\n" + notes.map((n) => `- ${n}`).join("\n"));
 }
 
 if (changed.length === 0 && misplaced.length === 0) {
