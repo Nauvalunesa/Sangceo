@@ -3,8 +3,6 @@
   "subdomain": "nvl",
   "owner": "Nauvalunesa",
   "records": {
-    "A": "203.0.113.9"
-  },
-  "proxy": false,
-  "description": "uji edit bebas"
+    "CNAME": "cname.vercel-dns.com"
+  }
 }

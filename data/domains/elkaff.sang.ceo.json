@@ -1,9 +1,9 @@
 {
- "domain": "sang.ceo",
- "subdomain": "elkaff",
- "owner": "elkhaff",
- "records": {
-  "CNAME": "62873a1b0171cbc0.vercel-dns-017.com"
+  "domain": "sang.ceo",
+  "subdomain": "elkaff",
+  "owner": "elkhaff",
+  "records": {
+    "CNAME": "62873a1b0171cbc0.vercel-dns-017.com"
   },
   "extra": [
     {
