@@ -1,1 +1,8 @@
-{"domain":"sang.ceo","subdomain":"jauhariel","owner":"jauhariqu","records":{"CNAME":"jauhariqu.github.io"}}
+{
+  "domain": "sang.ceo",
+  "subdomain": "jauhariel",
+  "owner": "jauhariqu",
+  "records": {
+    "CNAME": "jauhariqu.github.io"
+  }
+}

@@ -2,8 +2,8 @@
   "domain": "sang.ceo",
   "subdomain": "ariffb",
   "owner": "ariffb25",
-  "proxy": true,
   "records": {
     "CNAME": "ariffb25.github.io"
-  }
+  },
+  "proxy": true
 }

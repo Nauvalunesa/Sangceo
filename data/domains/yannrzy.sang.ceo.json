@@ -5,12 +5,12 @@
   "records": {
     "CNAME": "cname.vercel-dns.com"
   },
-  "proxy": true,
   "extra": [
     {
       "type": "TXT",
       "name": "_vercel",
       "value": "vc-domain-verify=yannrzy.sang.ceo,c4d157183c883813d713"
     }
-  ]
+  ],
+  "proxy": true
 }

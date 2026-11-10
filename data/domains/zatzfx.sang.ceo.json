@@ -2,7 +2,6 @@
   "domain": "sang.ceo",
   "subdomain": "zatzfx",
   "owner": "zat1818",
-  "description": "Holla👋",
   "records": {
     "CNAME": "cname.vercel-dns.com"
   },
@@ -13,5 +12,6 @@
       "value": "vc-domain-verify=zatzfx.sang.ceo,1cc1272aa28d4182451d",
       "at": "apex"
     }
-  ]
+  ],
+  "description": "Holla👋"
 }
