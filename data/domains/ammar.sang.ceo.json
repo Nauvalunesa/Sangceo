@@ -1,0 +1,9 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "ammar",
+  "owner": "ammaricanooo",
+  "records": { "CNAME": "1a435c9ce4a965b5.vercel-dns-017.com" },
+  "extra": [
+    { "type": "TXT", "name": "_vercel", "value": "vc-domain-verify=ammar.sang.ceo,343a677d89673309b930" }
+  ]
+}
