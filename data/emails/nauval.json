@@ -1,1 +1,6 @@
-{"domain":"sang.ceo","address":"nauval","type":"mailbox","owner":"Nauvalunesa"}
+{
+  "domain": "sang.ceo",
+  "owner": "Nauvalunesa",
+  "type": "mailbox",
+  "address": "nauval"
+}

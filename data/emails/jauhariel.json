@@ -1,1 +1,6 @@
-{"domain":"sang.ceo","address":"jauhariel","type":"mailbox","owner":"jauhariel"}
+{
+  "domain": "sang.ceo",
+  "owner": "jauhariel",
+  "type": "mailbox",
+  "address": "jauhariel"
+}

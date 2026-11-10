@@ -1,1 +1,7 @@
-{"domain":"sang.ceo","address":"zyro","type":"mailbox","owner":"GilangRamandan","contact":"gilram336@gmail.com"}
+{
+  "domain": "sang.ceo",
+  "owner": "GilangRamandan",
+  "contact": "gilram336@gmail.com",
+  "type": "mailbox",
+  "address": "zyro"
+}

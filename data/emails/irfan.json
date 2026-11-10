@@ -1,1 +1,7 @@
-{"domain":"sang.ceo","address":"irfan","type":"mailbox","owner":"rtwone","contact":"irfanmrg96@gmail.com"}
+{
+  "domain": "sang.ceo",
+  "owner": "rtwone",
+  "contact": "irfanmrg96@gmail.com",
+  "type": "mailbox",
+  "address": "irfan"
+}

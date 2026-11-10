@@ -1,1 +1,6 @@
-{"domain":"sang.ceo","address":"kado","type":"mailbox","owner":"kado"}
+{
+  "domain": "sang.ceo",
+  "owner": "kado",
+  "type": "mailbox",
+  "address": "kado"
+}

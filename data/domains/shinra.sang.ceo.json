@@ -1,1 +1,8 @@
-{"domain":"sang.ceo","subdomain":"shinra","owner":"unknown","records":{"CNAME":"82b3e22757da2fe6.vercel-dns-017.com"}}
+{
+  "domain": "sang.ceo",
+  "subdomain": "shinra",
+  "owner": "unknown",
+  "records": {
+    "CNAME": "82b3e22757da2fe6.vercel-dns-017.com"
+  }
+}
