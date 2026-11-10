@@ -4,5 +4,12 @@
   "owner": "fikryep",
   "records": {
     "CNAME": "cname.vercel-dns.com"
-  }
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=fikrysal.sang.ceo,3374b95346686473af94"
+    }
+  ]
 }
