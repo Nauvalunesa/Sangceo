@@ -1,0 +1,15 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "arfan",
+  "owner": "fandiplay",
+  "records": {
+    "CNAME": "2bbbd03aeda1b288.vercel-dns-017.com."
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=arfan.sang.ceo,324a5607af06d4622040"
+    }
+  ]
+}
