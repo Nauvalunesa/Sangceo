@@ -1,0 +1,8 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "fikrysal",
+  "owner": "fikryep",
+  "records": {
+    "CNAME": "cname.vercel-dns.com"
+  }
+}
