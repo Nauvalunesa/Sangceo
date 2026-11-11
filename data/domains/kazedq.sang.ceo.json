@@ -1,0 +1,9 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "kazedq",
+  "owner": "kagazuki",
+  "records": {
+    "A": "154.47.146.246"
+  },
+  "proxy": false
+}
