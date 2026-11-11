@@ -1,0 +1,8 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "limuchenstore",
+  "owner": "limuchen02",
+  "records": {
+    "CNAME": "cname.vercel-dns.com"
+  }
+}
