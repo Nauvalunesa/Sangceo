@@ -1,0 +1,8 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "masdika",
+  "owner": "Nauvalunesa",
+  "records": {
+    "CNAME": "masdika.id"
+  }
+}
