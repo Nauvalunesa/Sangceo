@@ -1,0 +1,16 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "ornzora",
+  "owner": "Ornzora",
+  "records": {
+    "CNAME": "1e5e9fe308449798.vercel-dns-017.com."
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=ornzora.sang.ceo,a4c37e136c8a4b4a1b51",
+      "at": "apex"
+    }
+  ]
+}
