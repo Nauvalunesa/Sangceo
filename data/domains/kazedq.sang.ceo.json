@@ -3,7 +3,7 @@
   "subdomain": "kazedq",
   "owner": "kagazuki",
   "records": {
-    "A": "154.47.146.246"
+    "CNAME": "kagazuki.github.io"
   },
   "proxy": false
 }
