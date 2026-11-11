@@ -1,80 +1,16 @@
-name: Umpan balik PR
+name: Umpan balik PR (tidak dipakai)
 
-# Terpisah dari validasi karena PR dari fork tidak menerima secrets. Di sini token
-# tersedia, jadi komentar dan penutupan PR gagal bisa dikerjakan.
+# Komentar dan penutupan PR yang gagal sekarang dikerjakan langsung oleh
+# validate-pr.yml, jadi hasilnya pasti ada selama pemeriksaannya ada. Berkas ini
+# disimpan hanya sebagai catatan.
 on:
-  workflow_run:
-    workflows: ["Validasi klaim"]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
-  umpan-balik:
-    if: github.event.workflow_run.event == 'pull_request'
+  catatan:
     runs-on: ubuntu-latest
     steps:
-      - name: Ambil log validasi
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: validate-log
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.BOT_TOKEN }}
-      - uses: actions/github-script@v7
-        continue-on-error: true
-        with:
-          github-token: ${{ secrets.BOT_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const run = context.payload.workflow_run;
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-
-            // Nomor PR dicari lewat head branch. commits/{sha}/pulls tidak
-            // menemukan PR dari fork, jadi jalur itu tidak dipakai.
-            const pr = await cariPR(run);
-            if (!pr) return;
-            const number = pr.number;
-
-            const gagal = run.conclusion !== 'success';
-            const adaLog = fs.existsSync('validate.log');
-            const log = adaLog ? fs.readFileSync('validate.log', 'utf8') : '';
-            const i = log.indexOf('###');
-            const isi = i === -1 ? log : log.slice(i);
-
-            if (!adaLog && !gagal) return;
-            await github.rest.issues.createComment({
-              owner, repo, issue_number: number,
-              body: (adaLog ? isi : `Validasi tidak selesai dengan sukses (${run.conclusion}), dan lognya tidak bisa dibaca. Periksa tab Actions run ${run.id}.`).slice(0, 60000),
-            });
-
-            // Hanya tutup kalau memang validasinya yang gagal, bukan karena masalah lain.
-            if (gagal && (!adaLog || /Perlu diperbaiki/.test(log))) {
-              await github.rest.issues.createComment({
-                owner, repo, issue_number: number,
-                body: 'Validasi gagal, jadi PR ini ditutup otomatis. Perbaiki file sesuai catatan di atas, lalu buka PR baru. Perubahan tidak akan pernah aktif lewat PR ini.',
-              });
-              await github.rest.pulls.update({ owner, repo, pull_number: number, state: 'closed' });
-            }
-
-            async function cariPR(run) {
-              const pemilikHead =
-                (run.head_repository && run.head_repository.owner && run.head_repository.owner.login) || owner;
-              try {
-                const { data } = await github.rest.pulls.list({
-                  owner, repo, state: 'open', head: `${pemilikHead}:${run.head_branch}`, per_page: 20,
-                });
-                const cocok = data.find((p) => p.head.sha === run.head_sha);
-                if (cocok) return cocok;
-                if (data.length) return data[0];
-              } catch {}
-              try {
-                const { data } = await github.rest.pulls.list({ owner, repo, state: 'open', per_page: 100 });
-                return data.find((p) => p.head.sha === run.head_sha) || null;
-              } catch {
-                return null;
-              }
-            }
+      - run: echo "Umpan balik ditangani .github/workflows/validate-pr.yml"

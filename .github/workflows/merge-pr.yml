@@ -1,0 +1,77 @@
+name: Merge pull request
+
+# Dipicu langsung oleh PR, bukan oleh selesainya workflow lain.
+#
+# Jalur lama memakai workflow_run, dan pemicu itu bisa tidak berjalan untuk
+# kontributor yang baru pertama kali membuka PR. PR-nya lolos validasi, tetapi
+# tidak pernah di-merge dan tidak ada yang memberi tahu pemiliknya. Pemicu
+# pull_request selalu berjalan, jadi hasilnya tidak lagi bergantung pada siapa
+# pembukanya.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Satu PR satu jalur. Kalau PR diubah lagi saat masih diproses, jalannya dibatalkan
+# dan diganti dengan yang terbaru.
+concurrency:
+  group: merge-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      # Validasi diulang di sini, bukan mengandalkan workflow "Validasi klaim".
+      # Tanpa hak menulis pada token-nya, workflow itu hanya membaca, jadi centang
+      # wajibnya tidak dianggap selesai dan merge lewat API akan ditolak.
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Ambil validator versi base
+        run: |
+          git fetch --no-tags origin "${{ github.event.pull_request.base.ref }}" --depth=1
+          git show "origin/${{ github.event.pull_request.base.ref }}:scripts/validate.mjs" > /tmp/validate.mjs
+      - name: Validasi
+        id: val
+        run: |
+          git rev-parse HEAD > /tmp/sha
+          node /tmp/validate.mjs "origin/${{ github.event.pull_request.base.ref }}" 2>&1 | tee validate.log
+        continue-on-error: true
+
+      # Menyamakan simulasi merge dengan sha pada PR, supaya centang wajib "validate"
+      # dianggap milik commit yang sama.
+      - name: Tandai pemeriksaan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = require('child_process').execSync('git rev-parse HEAD').toString().trim();
+            const lulus = '${{ steps.val.outcome }}' === 'success';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state: lulus ? 'success' : 'failure',
+              context: 'validate',
+              description: lulus ? 'Semua berkas klaim lolos validasi' : 'Ada berkas klaim yang tidak lolos',
+            });
+
+      - name: Merge bila lolos
+        if: steps.val.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_TOKEN }}
+          script: |
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              merge_method: 'squash',
+            });

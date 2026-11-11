@@ -5,6 +5,8 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
   validate:
@@ -27,15 +29,55 @@ jobs:
         id: val
         continue-on-error: true
         run: node /tmp/validate.mjs "${{ steps.base.outputs.sha }}" 2>&1 | tee validate.log; test ${PIPESTATUS[0]} -eq 0
-      # PR dari fork tidak menerima secrets, jadi komentar dan penutupan PR dikerjakan
-      # workflow terpisah (pr-feedback.yml) yang membaca hasil ini lewat artifact.
-      - name: Simpan hasil validasi
+
+      # Hasil ditulis langsung ke PR, tidak menunggu workflow lain.
+      #
+      # Sebelumnya komentar dan penutupan PR dikerjakan auto-merge.yml lewat
+      # pemicu workflow_run, dan pemicu itu tidak selalu berjalan untuk kontributor
+      # pertama. Akibatnya PR-nya lolos validasi tetapi tidak pernah di-merge dan
+      # tidak ada satu pun komentar yang menjelaskan kenapa. Sekarang keduanya
+      # dikerjakan di sini, jadi hasilnya pasti ada selama pemeriksaan ini ada.
+      - name: Baca hasil
+        id: hasil
         if: always()
-        uses: actions/upload-artifact@v4
+        run: |
+          {
+            echo "body<<HASIL"
+            cat validate.log
+            echo "HASIL"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Tanggapi PR
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          HASIL: ${{ steps.hasil.outputs.body }}
+          LULUS: ${{ steps.val.outcome == 'success' }}
         with:
-          name: validate-log
-          path: validate.log
-          if-no-files-found: error
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const lulus = process.env.LULUS === 'true';
+            const hasil = (process.env.HASIL || '(tidak ada keluaran)').slice(0, 60000);
+            const badan = lulus
+              ? `Semua berkas klaim lolos validasi. Pull request ini akan di-merge otomatis.\n\n\`\`\`\n${hasil}\n\`\`\``
+              : `Ada yang perlu diperbaiki:\n\n\`\`\`\n${hasil}\n\`\`\`\n\nPerbaiki berkasnya di PR ini, tidak perlu menutup dan membuka ulang.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: badan,
+            });
+
+            if (!lulus) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                state: 'closed',
+              });
+            }
+
       - name: Gagal bila validasi gagal
         if: steps.val.outcome == 'failure'
         run: exit 1
