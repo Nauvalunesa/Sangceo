@@ -1,0 +1,83 @@
+name: Periksa main
+
+# Pemeriksaan setelah commit mendarat di main.
+#
+# Penjaga PR hanya memeriksa pull request. Commit yang didorong langsung ke main tidak
+# melewati pemeriksaan apa pun, dan itu sudah menimbulkan kerusakan nyata: satu commit
+# perbaikan ikut menghapus klaim backend, frontend, henkaramazov, dan watim milik orang
+# lain, sementara dua berkas uji masuk. Tidak ada satu pun yang menolak, dan tidak ada
+# yang memberi tahu. Semua baru ketahuan karena pemeriksaan manual.
+#
+# Tugas workflow ini bukan mencegah (commit sudah terlanjur masuk), melainkan membuat
+# kerusakan langsung terlihat, lengkap dengan nama berkasnya.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  periksa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Periksa seluruh isi data/
+        id: periksa
+        run: |
+          set +e
+          : > /tmp/hasil.txt
+          # Mode --semua memeriksa seluruh isi data/, bukan hanya yang berubah, dan
+          # membandingkan nama dengan isi commit itu sendiri sehingga nama ganda ikut
+          # terdeteksi.
+          node scripts/validate.mjs --semua HEAD >> /tmp/hasil.txt 2>&1
+          KODE=$?
+          if [ "$KODE" -ne 0 ]; then
+            echo "ada=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "ada=0" >> "$GITHUB_OUTPUT"
+          fi
+          cat /tmp/hasil.txt
+
+      - name: Laporkan kalau ada yang salah
+        if: steps.periksa.outputs.ada == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo '<!-- periksa-main -->'
+            echo "Commit \`${GITHUB_SHA:0:7}\` di main tidak lolos pemeriksaan."
+            echo
+            echo '```'
+            cat /tmp/hasil.txt
+            echo '```'
+            echo
+            echo "Pull request dari kontributor selalu diperiksa sebelum merge, jadi ini hampir"
+            echo "pasti berasal dari commit yang didorong langsung ke main. Perbaiki lewat pull"
+            echo "request supaya perubahannya ikut diperiksa."
+          } > /tmp/laporan.md
+
+          JUDUL="main berisi data yang tidak lolos pemeriksaan"
+          # Satu issue saja, ditambah komentar selama masih bermasalah. Membuka issue
+          # baru setiap kali push akan membanjiri dan justru diabaikan.
+          NOMOR=$(gh issue list --state open --search "$JUDUL in:title" --json number -q '.[0].number' 2>/dev/null)
+          if [ -z "$NOMOR" ]; then
+            gh issue create --title "$JUDUL" --body-file /tmp/laporan.md
+          else
+            gh issue comment "$NOMOR" --body-file /tmp/laporan.md
+          fi
+
+      - name: Tutup laporan lama kalau sudah bersih
+        if: steps.periksa.outputs.ada == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          JUDUL="main berisi data yang tidak lolos pemeriksaan"
+          for n in $(gh issue list --state open --search "$JUDUL in:title" --json number -q '.[].number'); do
+            gh issue comment "$n" --body "Commit \`${GITHUB_SHA:0:7}\` sudah lolos pemeriksaan. Issue ini ditutup otomatis."
+            gh issue close "$n"
+          done

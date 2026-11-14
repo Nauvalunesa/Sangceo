@@ -108,12 +108,25 @@ if [ -n "${NOMOR_PR:-}" ]; then
 else
   mapfile -t DAFTAR < <(gh pr list --state open --limit 100 --json number -q '.[].number' 2>/dev/null)
 fi
-echo "PR terbuka: ${#DAFTAR[@]}"
+# Pemelihara tidak diperiksa kepemilikannya.
+#
+# Pemeriksaan `owner` ada untuk mencegah orang lain mengambil alih klaim. Pemilik repo
+# sendiri tidak perlu dilindungi dari dirinya sendiri, dan justru dialah yang harus
+# bisa memperbaiki kerusakan yang ditinggalkan commit lain. Tanpa ini, satu-satunya
+# jalan memperbaiki data adalah mendorong langsung ke main, memutar semua pagar yang
+# ada dan sudah terbukti menimbulkan kerusakan.
+PEMILIK_REPO=$(gh repo view --json owner -q .owner.login 2>/dev/null)
+echo "PR terbuka: ${#DAFTAR[@]} (pemelihara: ${PEMILIK_REPO:-tidak diketahui})"
 
 for n in "${DAFTAR[@]}"; do
   INFO=$(gh pr view "$n" --json isDraft,author,headRefName,headRepositoryOwner 2>/dev/null) || continue
   [ "$(echo "$INFO" | jq -r '.isDraft')" = "true" ] && continue
   AUTHOR=$(echo "$INFO" | jq -r '.author.login')
+  TRUSTED=0
+  if [ -n "$PEMILIK_REPO" ] && [ "$(echo "$AUTHOR" | tr '[:upper:]' '[:lower:]')" = "$(echo "$PEMILIK_REPO" | tr '[:upper:]' '[:lower:]')" ]; then
+    TRUSTED=1
+    echo "    pemelihara, pemeriksaan kepemilikan dilewati (validasi tetap jalan)"
+  fi
   REF=$(echo "$INFO" | jq -r '.headRefName')
   PEMILIK_HEAD=$(echo "$INFO" | jq -r '.headRepositoryOwner.login // empty')
   echo "--- PR #$n oleh $AUTHOR (head: $PEMILIK_HEAD:$REF)"
@@ -190,7 +203,7 @@ for n in "${DAFTAR[@]}"; do
         BOLEH=0; TUTUP=1; SEBAB="pemilik $f tidak bisa dipastikan, penghapusan ditolak"
         continue
       fi
-      if [ "$(echo "$OWNER_HAPUS" | tr '[:upper:]' '[:lower:]')" != "$(echo "$AUTHOR" | tr '[:upper:]' '[:lower:]')" ]; then
+      if [ "$TRUSTED" -eq 0 ] && [ "$(echo "$OWNER_HAPUS" | tr '[:upper:]' '[:lower:]')" != "$(echo "$AUTHOR" | tr '[:upper:]' '[:lower:]')" ]; then
         BOLEH=0; TUTUP=1; SEBAB="berkas $f milik $OWNER_HAPUS, bukan $AUTHOR"
       fi
       HAPUS=1
@@ -200,7 +213,7 @@ for n in "${DAFTAR[@]}"; do
     if [ -z "$OWNER" ] || [ -z "$AUTHOR" ]; then
       BOLEH=0; TUTUP=1; SEBAB="pemilik $f tidak bisa dipastikan, perubahan ditolak"; continue
     fi
-    if [ "$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')" != "$(echo "$AUTHOR" | tr '[:upper:]' '[:lower:]')" ]; then
+    if [ "$TRUSTED" -eq 0 ] && [ "$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')" != "$(echo "$AUTHOR" | tr '[:upper:]' '[:lower:]')" ]; then
       # Berkas baru dengan owner salah ketik: bisa diperbaiki di tempat, jangan ditutup.
       if git cat-file -e "$BASE:$f" 2>/dev/null; then
         BOLEH=0; TUTUP=1; SEBAB="berkas $f tercatat atas nama $OWNER, bukan $AUTHOR"
@@ -211,7 +224,7 @@ for n in "${DAFTAR[@]}"; do
       continue
     fi
     LAMA=$(git show "$BASE:$f" 2>/dev/null || true)
-    if [ -n "$LAMA" ]; then
+    if [ -n "$LAMA" ] && [ "$TRUSTED" -eq 0 ]; then
       for k in $BEKU; do
         a=$(echo "$LAMA" | jq -r --arg k "$k" '.[$k] // ""')
         b=$(isi_pr "$f" | jq -r --arg k "$k" '.[$k] // ""')

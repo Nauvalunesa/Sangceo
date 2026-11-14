@@ -5,7 +5,11 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 
-const BASE = process.argv[2]; // contoh: origin/main
+const BASE = process.argv[2]; // contoh: origin/main, atau --semua
+// Mode --semua memeriksa SELURUH isi data/ pada satu commit, bukan hanya yang berubah.
+// Dipakai setelah commit mendarat di main, karena commit yang didorong langsung tidak
+// melewati pemeriksaan pull request sama sekali.
+const SEMUA = BASE === "--semua";
 // Commit yang diperiksa. Dulu selalu HEAD, dan itu memaksa pemanggil menyamakan pohon
 // kerja dengan isi PR lebih dulu. Pohon kerja yang diubah-ubah itulah yang bikin
 // masalah: berkas yang tercatat berubah bisa saja sudah tidak ada di cakram, dan
@@ -20,9 +24,11 @@ function isiBerkas(rel) {
   return execSync(`git show ${PR}:${rel}`, { encoding: "utf8", maxBuffer: 8 << 20 });
 }
 
-const changedAll = execSync(`git diff --name-only --diff-filter=ACM ${BASE}...${PR}`, {
-  encoding: "utf8",
-})
+const changedAll = (
+  SEMUA
+    ? execSync(`git ls-tree -r --name-only ${PR} -- data`, { encoding: "utf8" })
+    : execSync(`git diff --name-only --diff-filter=ACM ${BASE}...${PR}`, { encoding: "utf8" })
+)
   .split("\n")
   .filter(Boolean);
 
@@ -43,8 +49,8 @@ const ADDR_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // bisa diklaim dua kali lewat dua berkas berbeda. Diuji: gen-dnsconfig lalu menghasilkan
 // dua CNAME untuk satu nama, dan Push DNSControl menolak seluruh berkas. Record semua
 // orang ikut tertahan, bukan hanya milik pelakunya.
-function bacaKlaim(dir) {
-  const daftarBerkas = execSync(`git ls-tree -r --name-only ${BASE} -- ${dir}`, { encoding: "utf8" })
+function bacaKlaim(dir, ref) {
+  const daftarBerkas = execSync(`git ls-tree -r --name-only ${ref} -- ${dir}`, { encoding: "utf8" })
     .split("\n")
     .filter(Boolean);
   const hasil = [];
@@ -52,7 +58,7 @@ function bacaKlaim(dir) {
     try {
       hasil.push({
         file: f,
-        ...JSON.parse(execSync(`git show ${BASE}:${f}`, { encoding: "utf8", maxBuffer: 8 << 20 })),
+        ...JSON.parse(execSync(`git show ${ref}:${f}`, { encoding: "utf8", maxBuffer: 8 << 20 })),
       });
     } catch {
       // Berkas rusak di main bukan urusan PR ini.
@@ -64,9 +70,13 @@ function bacaKlaim(dir) {
 // Peta nama -> berkas pemiliknya. Bentuk peta, bukan himpunan, supaya bisa dibedakan
 // antara "berkas ini memang pemiliknya" dan "nama ini dipegang berkas lain".
 const existing = { sub: new Map(), mail: new Map() };
-for (const x of bacaKlaim("data/domains"))
+// Pada mode --semua, pembandingnya adalah isi commit itu sendiri. Dengan begitu nama
+// yang dipakai dua berkas tetap terdeteksi, bukan hanya nama yang bertabrakan dengan
+// branch tujuan.
+const SUMBER = SEMUA ? PR : BASE;
+for (const x of bacaKlaim("data/domains", SUMBER))
   if (x.subdomain) existing.sub.set(String(x.subdomain).toLowerCase(), x.file);
-for (const x of bacaKlaim("data/emails"))
+for (const x of bacaKlaim("data/emails", SUMBER))
   if (x.address) existing.mail.set(String(x.address).toLowerCase(), x.file);
 
 // Nama yang tidak boleh dipegang pengklaim.
