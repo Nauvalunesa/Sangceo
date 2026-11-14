@@ -274,30 +274,23 @@ for (const file of changed) {
             errors.push(`${at}: \`name\` harus satu label huruf kecil/angka/tanda hubung, boleh diawali \`_\``);
           if (typeof x.value !== "string" || x.value.length === 0 || x.value.length > 500 || /[\r\n]/.test(x.value))
             errors.push(`${at}: \`value\` harus string 1-500 karakter tanpa baris baru`);
-          // Vercel punya dua alur. Kalau subdomain masih di akun Vercel sendiri, TXT
-          // diletakkan di bawah subdomain. Kalau tertaut ke akun Vercel lain, Vercel
-          // meminta record di level zona, dan itu harus ditulis `at: "apex"`.
-          if (x.at !== "apex" && /^vc-domain-verify=[a-z0-9.-]+,[a-z0-9]+$/i.test(String(x.value))) {
-            notes.push(
-              `${at}: record ini diletakkan di \`${x.name}.${subdomain}.${ZONE}\`. ` +
-                `Vercel meminta dua tempat berbeda: kalau dashboard menulis "This domain is linked to another Vercel account" ` +
-                `dan menampilkan \`_vercel.${ZONE}\`, recordnya harus di level zona dengan menambahkan \`"at": "apex"\`. ` +
-                `Gantilah entri yang ada (bukan menambah entri kedua): ` +
-                `\`{ "type": "TXT", "name": "${x.name}", "at": "apex", "value": "${x.value}" }\`.`
+          // Level zona tidak lagi boleh dipakai, dan alasannya bukan sekadar kerapian.
+          //
+          // Delapan klaim pernah menulis `at: "apex"` karena menyalin apa adanya dari
+          // Vercel, dan semuanya berakhir sebagai delapan nilai TXT pada satu nama
+          // `_vercel.sang.ceo`. Vercel tidak pernah membaca tempat itu: ia memeriksa
+          // `_vercel.<domain>`. Jadi kedelapan orang itu menunggu verifikasi yang tidak
+          // akan pernah datang, sementara di repo semuanya tampak beres.
+          //
+          // Nama level zona juga bukan milik pengklaim. Yang boleh menulis di sana hanya
+          // pemilik zona; itu sudah diurus di luar registry.
+          if (x.at !== undefined)
+            errors.push(
+              `${at}: \`at\` tidak dipakai lagi, hapus baris itu. ` +
+                `Verifikasi diletakkan di bawah namamu sendiri: \`${x.name}.${subdomain}.${ZONE}\`. ` +
+                `Kalau Vercel menampilkan \`${x.name}.${ZONE}\`, berarti yang sedang diverifikasi ` +
+                `domain \`${ZONE}\` itu sendiri, bukan subdomainmu.`
             );
-          }
-          if (x.at === "apex") {
-            // Record level zona hanya untuk verifikasi kepemilikan subdomain lewat Vercel.
-            // Tanpa batas ini, siapa pun bisa memverifikasi kepemilikan zona sang.ceo itu sendiri.
-            if (x.name !== "_vercel")
-              errors.push(`${at}: \`at: "apex"\` hanya untuk \`name: "_vercel"\``);
-            if (!/^vc-domain-verify=[a-z0-9.-]+,[a-z0-9]+$/i.test(String(x.value)))
-              errors.push(`${at}: nilai level zona harus format Vercel \`vc-domain-verify=<domain>,<kode>\``);
-            if (/^vc-domain-verify=sang\.ceo,/i.test(String(x.value)))
-              errors.push(`${at}: nilai tidak boleh memverifikasi zona sang.ceo itu sendiri`);
-          } else if (x.at !== undefined && x.at !== "sub") {
-            errors.push(`${at}: \`at\` hanya boleh "sub" (default) atau "apex"`);
-          }
         });
       }
     }
