@@ -24,20 +24,88 @@ const HOST_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)
 const EMAIL_RE = /^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/;
 const ADDR_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Nama yang sudah ada di main, untuk cek duplikat lintas file.
-const existing = {
-  sub: new Set(
-    execSync(`git ls-tree -r --name-only ${BASE} -- data/domains`, { encoding: "utf8" })
-      .split("\n")
-      .filter(Boolean)
-      .map((f) => f.split("/").pop().replace(`.${ZONE}.json`, "").replace(".json", ""))
-  ),
-  mail: new Set(
-    execSync(`git ls-tree -r --name-only ${BASE} -- data/emails`, { encoding: "utf8" })
-      .split("\n")
-      .filter(Boolean)
-      .map((f) => f.split("/").pop().replace(".json", ""))
-  ),
+// Nama yang sudah diklaim di main, dibaca dari ISI berkas, bukan dari nama berkasnya.
+//
+// Sebelumnya daftar ini disusun dari nama berkas. Akibatnya satu berkas yang namanya
+// tidak cocok dengan isinya tidak pernah masuk daftar, sehingga subdomain yang sama
+// bisa diklaim dua kali lewat dua berkas berbeda. Diuji: gen-dnsconfig lalu menghasilkan
+// dua CNAME untuk satu nama, dan Push DNSControl menolak seluruh berkas. Record semua
+// orang ikut tertahan, bukan hanya milik pelakunya.
+function bacaKlaim(dir) {
+  const daftarBerkas = execSync(`git ls-tree -r --name-only ${BASE} -- ${dir}`, { encoding: "utf8" })
+    .split("\n")
+    .filter(Boolean);
+  const hasil = [];
+  for (const f of daftarBerkas) {
+    try {
+      hasil.push({
+        file: f,
+        ...JSON.parse(execSync(`git show ${BASE}:${f}`, { encoding: "utf8", maxBuffer: 8 << 20 })),
+      });
+    } catch {
+      // Berkas rusak di main bukan urusan PR ini.
+    }
+  }
+  return hasil;
+}
+
+// Peta nama -> berkas pemiliknya. Bentuk peta, bukan himpunan, supaya bisa dibedakan
+// antara "berkas ini memang pemiliknya" dan "nama ini dipegang berkas lain".
+const existing = { sub: new Map(), mail: new Map() };
+for (const x of bacaKlaim("data/domains"))
+  if (x.subdomain) existing.sub.set(String(x.subdomain).toLowerCase(), x.file);
+for (const x of bacaKlaim("data/emails"))
+  if (x.address) existing.mail.set(String(x.address).toLowerCase(), x.file);
+
+// Nama yang tidak boleh dipegang pengklaim.
+//
+// Bukan soal selera. Sebagian nama ini sudah dipakai infrastruktur zona dan masuk
+// daftar IGNORE_NAME gen-dnsconfig: record yang dideklarasikan untuk nama seperti itu
+// tidak akan pernah sampai ke Cloudflare, jadi pemiliknya menunggu record yang tidak
+// akan muncul, tanpa satu pun pesan galat. Sisanya nama yang lazim dipakai penipuan
+// dengan mengatasnamakan zona ini.
+const SUB_DICADANGKAN = {
+  mail: "dipakai host webmail ruang.email",
+  webmail: "dipakai host webmail ruang.email",
+  autoconfig: "dipakai penemuan setelan surel",
+  autodiscover: "dipakai penemuan setelan surel",
+  www: "nama yang lazim dipakai situs utama",
+  smtp: "nama layanan surel",
+  imap: "nama layanan surel",
+  pop: "nama layanan surel",
+  pop3: "nama layanan surel",
+  mx: "nama layanan surel",
+  mx1: "nama layanan surel",
+  mx2: "nama layanan surel",
+  mx3: "nama layanan surel",
+  ns: "nama layanan Domain",
+  ns1: "nama layanan Domain",
+  ns2: "nama layanan Domain",
+  dns: "nama layanan Domain",
+  admin: "nama yang lazim dipakai penipuan",
+  administrator: "nama yang lazim dipakai penipuan",
+  root: "nama yang lazim dipakai penipuan",
+  abuse: "nama yang lazim dipakai penipuan",
+  security: "nama yang lazim dipakai penipuan",
+  support: "nama yang lazim dipakai penipuan",
+  billing: "nama yang lazim dipakai penipuan",
+  postmaster: "nama yang lazim dipakai penipuan",
+  ftp: "nama layanan lama",
+  cpanel: "nama panel hosting",
+};
+
+const ALAMAT_DICADANGKAN = {
+  postmaster: "wajib ada di setiap zona surel",
+  abuse: "wajib ada di setiap zona surel",
+  "mailer-daemon": "dipakai sistem surel",
+  "no-reply": "dipakai pengirim otomatis",
+  noreply: "dipakai pengirim otomatis",
+  hostmaster: "nama administratif zona",
+  webmaster: "nama administratif zona",
+  admin: "nama yang lazim dipakai penipuan",
+  administrator: "nama yang lazim dipakai penipuan",
+  root: "nama yang lazim dipakai penipuan",
+  security: "nama yang lazim dipakai penipuan",
 };
 
 const errors = [];
@@ -84,6 +152,23 @@ for (const file of changed) {
     if (domain !== ZONE) errors.push(`\`${rel}\`: \`domain\` harus \`${ZONE}\``);
     if (!subdomain || !NAME_RE.test(subdomain))
       errors.push(`\`${rel}\`: \`subdomain\` tidak valid (huruf kecil, angka, tanda hubung)`);
+    // Satu label saja. Nama bertitik membuat subzona yang tidak bisa dibuat generator
+    // dan tidak bisa diperiksa halaman cek, jadi lebih baik ditolak di sini.
+    if (typeof subdomain === "string" && subdomain.includes("."))
+      errors.push(`\`${rel}\`: \`subdomain\` harus satu label tanpa titik, mis. \`namamu\`, bukan \`a.namamu\``);
+    // Nama berkas WAJIB sama dengan subdomain di dalamnya.
+    //
+    // Tanpa aturan ini, nama berkas tidak bisa dipakai sebagai penjaga apa pun: satu
+    // berkas bernama apa saja boleh memuat subdomain siapa saja, dan cek duplikat
+    // yang lama tidak melihatnya.
+    if (typeof subdomain === "string" && rel !== `data/domains/${subdomain}.${ZONE}.json`)
+      errors.push(
+        `\`${rel}\`: nama berkas harus sama dengan \`subdomain\` di dalamnya. Ganti nama berkas menjadi \`data/domains/${subdomain}.${ZONE}.json\`.`
+      );
+    if (typeof subdomain === "string" && SUB_DICADANGKAN[subdomain])
+      errors.push(
+        `\`${rel}\`: nama \`${subdomain}\` tidak bisa diklaim karena ${SUB_DICADANGKAN[subdomain]}. Pilih nama lain lewat https://${ZONE}/daftar`
+      );
     if (!owner) errors.push(`\`${rel}\`: \`owner\` (username GitHub) wajib`);
     if (!records || typeof records !== "object" || Object.keys(records).length === 0)
       errors.push(`\`${rel}\`: \`records\` wajib berisi minimal satu record`);
@@ -132,8 +217,10 @@ for (const file of changed) {
     // CNAME harus satu-satunya record pada namanya, aturan DNS.
     if (records?.CNAME && Object.keys(records).length > 1)
       errors.push(`\`${rel}\`: \`CNAME\` harus satu-satunya record. Hapus tipe lain, atau ganti CNAME menjadi A/AAAA.`);
-    if (subdomain && existing.sub.has(subdomain) && !rel.endsWith(`/${subdomain}.${ZONE}.json`))
-      errors.push(`\`${rel}\`: subdomain \`${subdomain}\` sudah diklaim orang lain`);
+    if (subdomain && existing.sub.has(subdomain) && existing.sub.get(subdomain) !== rel)
+      errors.push(
+        `\`${rel}\`: subdomain \`${subdomain}\` sudah diklaim lewat \`${existing.sub.get(subdomain)}\``
+      );
     if (subdomain && records?.CNAME && NAME_RE.test(subdomain)) {
       if (typeof records.CNAME !== "string")
         errors.push(`\`${rel}\`: CNAME harus berupa string tunggal`);
@@ -205,13 +292,24 @@ for (const file of changed) {
     if (domain !== ZONE) errors.push(`\`${rel}\`: \`domain\` harus \`${ZONE}\``);
     if (!address || !EMAIL_RE.test(address))
       errors.push(`\`${rel}\`: \`address\` tidak valid (huruf kecil, angka, titik, tanda hubung)`);
+    // Alasan sama dengan berkas subdomain: nama berkas harus mencerminkan isinya.
+    if (typeof address === "string" && rel !== `data/emails/${address}.json`)
+      errors.push(
+        `\`${rel}\`: nama berkas harus sama dengan \`address\` di dalamnya. Ganti nama berkas menjadi \`data/emails/${address}.json\`.`
+      );
+    if (typeof address === "string" && ALAMAT_DICADANGKAN[address])
+      errors.push(
+        `\`${rel}\`: alamat \`${address}@${ZONE}\` tidak bisa diklaim karena ${ALAMAT_DICADANGKAN[address]}. Pilih nama lain lewat https://${ZONE}/email`
+      );
     if (!owner) errors.push(`\`${rel}\`: \`owner\` (username GitHub) wajib`);
     if (type && type !== "mailbox")
       errors.push(`\`${rel}\`: hanya \`type: "mailbox"\` yang didukung`);
     if (contact && !ADDR_RE.test(contact))
       errors.push(`\`${rel}\`: \`contact\` harus alamat email yang valid`);
-    if (address && existing.mail.has(address) && !rel.endsWith(`/${address}.json`))
-      errors.push(`\`${rel}\`: alamat \`${address}\` sudah diklaim orang lain`);
+    if (address && existing.mail.has(address) && existing.mail.get(address) !== rel)
+      errors.push(
+        `\`${rel}\`: alamat \`${address}\` sudah diklaim lewat \`${existing.mail.get(address)}\``
+      );
     // Tanpa `contact`, pelacakan penerima sandi bergantung pada akun GitHub pengklaim.
     // Kalau itu gagal, sandi tidak dikirim ke siapa pun, jadi pemilik perlu tahu lebih awal.
     if (rel.endsWith(`/${address}.json`) && !contact) {
