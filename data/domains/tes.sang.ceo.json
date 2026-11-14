@@ -1,8 +1,0 @@
-{
-  "domain": "sang.ceo",
-  "subdomain": "tes",
-  "owner": "Nauvalunesa",
-  "records": {
-    "CNAME": "cname.vercel-dns.com"
-  }
-}
