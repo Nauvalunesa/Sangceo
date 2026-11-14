@@ -9,13 +9,21 @@
 #   3. Field domain, subdomain, owner, address tidak berubah dari versi main.
 #   4. `owner` di setiap berkas sama persis dengan penulis PR. Tanpa pengecualian.
 #   5. Akun penulis memang ada di GitHub.
+#   6. Berkas yang ditambah belum ada di main. Kalau sudah ada dengan isi setara, PR
+#      ditutup sebagai klaim ganda, bukan dibiarkan berkonflik selamanya.
 #
-# Dijalankan oleh pr-jaga.yml lewat jadwal dan workflow_dispatch, TIDAK lewat
-# pull_request. Bukan selera: workflow yang dipicu pull_request dari fork selalu
-# menerima token baca-saja, sekalipun `permissions:` menulis `write` dan setelan repo
-# juga `write`. Log run membuktikannya: "Contents: read / Issues: read /
+# Dijalankan oleh pr-jaga.yml lewat pull_request_target, jadwal, dan workflow_dispatch.
+# Untuk pull_request_target, variabel NOMOR_PR berisi satu nomor dan hanya PR itu yang
+# diperiksa. Kalau kosong, semua PR terbuka diperiksa.
+#
+# Pemicu pull_request_target dipakai karena workflow yang dipicu pull_request dari fork
+# selalu menerima token baca-saja, sekalipun `permissions:` menulis `write` dan setelan
+# repo juga `write`. Log run membuktikannya: "Contents: read / Issues: read /
 # PullRequests: read". Dengan izin itu bot tidak bisa berkomentar, menutup, apalagi
 # merge, sehingga setiap PR dari kontributor baru menggantung tanpa penjelasan.
+#
+# Pagar keamanan: skrip ini TIDAK PERNAH menjalankan kode dari PR. Validator diambil
+# dari branch tujuan dan disalin ke /tmp. Berkas dari PR hanya dibaca sebagai JSON.
 set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
@@ -25,6 +33,7 @@ BEKU="domain subdomain owner address"
 # Penanda beda untuk tiap sebab, jadi perubahan aturan tidak meninggalkan pesan basi.
 MARK_DITOLAK="<!-- jaga-pr:ditolak -->"
 MARK_TINJAU="<!-- jaga-pr:tinjau -->"
+MARK_GANDA="<!-- jaga-pr:ganda -->"
 
 git config --global --add safe.directory "$PWD" 2>/dev/null || true
 git fetch -q origin main || exit 1
@@ -42,7 +51,11 @@ akun_ada() {
   [ -n "$1" ] && gh api "users/$1" --jq .login >/dev/null 2>&1
 }
 
-mapfile -t DAFTAR < <(gh pr list --state open --limit 100 --json number -q '.[].number' 2>/dev/null)
+if [ -n "${NOMOR_PR:-}" ]; then
+  DAFTAR=("$NOMOR_PR")
+else
+  mapfile -t DAFTAR < <(gh pr list --state open --limit 100 --json number -q '.[].number' 2>/dev/null)
+fi
 echo "PR terbuka: ${#DAFTAR[@]}"
 
 for n in "${DAFTAR[@]}"; do
@@ -135,6 +148,38 @@ for n in "${DAFTAR[@]}"; do
       done
     fi
   done
+
+  # Berkas yang ditambah tetapi sudah ada di main. Dua PR untuk klaim yang sama
+  # membuat git menandainya "add/add conflict", dan tanpa pemeriksaan ini PR-nya
+  # menggantung dengan status konflik tanpa penjelasan apa pun.
+  GANDA=""
+  for f in $BERUBAH; do
+    case "$f" in data/domains/*.json|data/emails/*.json) ;; *) continue ;; esac
+    [ -f "$f" ] || continue
+    LAMA=$(git show "$BASE:$f" 2>/dev/null || true)
+    [ -n "$LAMA" ] || continue
+    SUB_BARU=$(jq -r '.subdomain // .address // ""' "$f" 2>/dev/null)
+    SUB_LAMA=$(echo "$LAMA" | jq -r '.subdomain // .address // ""' 2>/dev/null)
+    OWNER_LAMA=$(echo "$LAMA" | jq -r '.owner // ""' 2>/dev/null)
+    if [ "$SUB_BARU" = "$SUB_LAMA" ] && [ "$SUB_LAMA" != "" ] \
+       && [ "$(echo "$OWNER_LAMA" | tr '[:upper:]' '[:lower:]')" = "$(echo "$AUTHOR" | tr '[:upper:]' '[:lower:]')" ]; then
+      GANDA="$SUB_LAMA"
+    fi
+  done
+
+  if [ -n "$GANDA" ]; then
+    echo "    klaim $GANDA sudah ada di main, PR ditutup sebagai klaim ganda"
+    if ! sudah_komentar "$n" "$MARK_GANDA"; then
+      komentar "$n" "$MARK_GANDA
+Klaim \`$GANDA\` sudah aktif di main atas namamu, jadi pull request ini ditutup tanpa merge.
+
+Ini biasanya terjadi karena tombol klaim ditekan dua kali, atau karena pull request sebelumnya sudah masuk tetapi halamannya belum dimuat ulang. Tidak ada yang perlu diperbaiki: subdomain dan mailbox-mu sudah jalan.
+
+Kalau yang kamu maksud sebenarnya **mengubah** klaim yang sudah ada, gunakan halaman kelola di <https://sang.ceo/kelola>, bukan membuat berkas baru."
+    fi
+    gh pr close "$n" >/dev/null 2>&1 || true
+    continue
+  fi
 
   if [ "$BOLEH" -eq 0 ]; then
     echo "    ditolak: $SEBAB"

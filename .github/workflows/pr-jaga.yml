@@ -2,42 +2,47 @@ name: Penjaga PR
 
 # Satu-satunya jalur yang mengomentari, menutup, dan meng-merge PR.
 #
-# Workflow yang dipicu pull_request dari fork selalu menerima token baca-saja,
-# sekalipun `permissions:` menulis `write` dan setelan repo juga `write`. Log run
-# membuktikannya: "Contents: read / Issues: read / PullRequests: read". Akibatnya
-# setiap PR dari kontributor baru menggantung tanpa komentar dan tanpa merge.
+# Kenapa pull_request_target, bukan pull_request:
 #
-# Pemicu di sini sengaja bukan pull_request, melainkan jadwal dan workflow_dispatch.
-# Keduanya berjalan di repo ini dengan izin penuh, dan tidak ada kode atau skrip dari
-# fork yang ikut dijalankan. Run yang dipicu jadwal juga tidak pernah berstatus
-# "action_required", jadi tidak ada lagi tombol approve yang harus ditekan pemilik
-# repo. PR baru ditangani paling lama tiga menit setelah dibuka.
+# Workflow yang dipicu pull_request dari fork SELALU menerima token baca-saja,
+# sekalipun `permissions:` menulis `write` dan setelan repo juga `write`. Log run
+# membuktikannya: "Contents: read / Issues: read / PullRequests: read". Akibatnya bot
+# tidak bisa berkomentar, menutup, apalagi merge, dan setiap PR dari kontributor baru
+# menggantung tanpa penjelasan.
+#
+# pull_request_target membaca definisi workflow dari branch TUJUAN, bukan dari fork.
+# Karena tidak ada kode fork yang dijalankan, GitHub tidak meminta persetujuan
+# kontributor baru, dan tokennya penuh. PR ditangani dalam hitungan detik.
+#
+# Pagar keamanannya: pekerjaan ini HANYA membaca berkas data/ dari PR. Validator selalu
+# diambil dari branch tujuan, tidak pernah dari fork. Tidak ada npm install, tidak ada
+# skrip dari PR yang dijalankan. Jangan pernah mengubah aturan itu.
 on:
-  # Setiap menit sebagai jaring pengaman. GitHub tidak menjamin jadwal rapat, dan
-  # run terjadwal bisa tertunda beberapa menit saat repo sibuk. Karena itu jalur
-  # utama bukan jadwal, melainkan workflow_run di bawah.
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  # Jaring pengaman. GitHub menahan jadwal yang terlalu rapat: permintaan tiap menit
+  # ternyata dijalankan kira-kira tiap enam jam. Karena itu jadwal di sini hanya untuk
+  # menyapu PR yang terlewat, dan jalur utamanya tetap pull_request_target di atas.
   schedule:
-    - cron: "* * * * *"
-  # Begitu "Kabari penjaga" selesai, penjaga langsung jalan. Pemicu workflow_run
-  # berjalan di repo ini dengan izin penuh, tidak seperti pull_request dari fork.
-  workflow_run:
-    workflows: ["Kabari penjaga"]
-    types: [completed]
+    - cron: "*/10 * * * *"
   workflow_dispatch:
+
+# Satu PR satu jalur. Kalau PR diubah saat masih diproses, jalannya diganti yang baru.
+concurrency:
+  group: jaga-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
 
-concurrency:
-  group: penjaga-pr
-  cancel-in-progress: false
-
 jobs:
   jaga:
     runs-on: ubuntu-latest
     steps:
+      # Tanpa `ref`, checkout memakai branch tujuan untuk pull_request_target. Itu
+      # yang diinginkan: skrip penjaga dan validator harus versi main, bukan versi PR.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -46,6 +51,8 @@ jobs:
           node-version: 22
       - name: Periksa dan bereskan PR terbuka
         env:
-          # Token bawaan GitHub, bukan secret. gh membacanya dari GH_TOKEN.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Untuk pull_request_target, nomor PR diambil dari event. Untuk jadwal dan
+          # manual, kosong, dan penjaga memeriksa semua PR terbuka.
+          NOMOR_PR: ${{ github.event.pull_request.number }}
         run: bash scripts/jaga-pr.sh
