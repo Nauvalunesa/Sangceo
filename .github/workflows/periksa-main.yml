@@ -13,6 +13,8 @@ name: Periksa main
 on:
   push:
     branches: [main]
+  # Untuk menguji sendiri tanpa harus mendorong commit yang merusak.
+  workflow_dispatch:
 
 permissions:
   contents: read
