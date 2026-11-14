@@ -19,7 +19,11 @@ name: Penjaga PR
 # skrip dari PR yang dijalankan. Jangan pernah mengubah aturan itu.
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    # ready_for_review wajib ada. PR draft hanya memicu `opened`, dan merge draft
+    # ditolak GitHub. Tanpa jenis ini, kontributor yang membuka draft lalu menandainya
+    # siap dinilai tidak memicu apa pun, dan PR-nya menganggur sampai sapuan terjadwal
+    # berikutnya, yang bisa berjam-jam kemudian.
+    types: [opened, synchronize, reopened, ready_for_review]
   # Jaring pengaman. GitHub menahan jadwal yang terlalu rapat: permintaan tiap menit
   # ternyata dijalankan kira-kira tiap enam jam. Karena itu jadwal di sini hanya untuk
   # menyapu PR yang terlewat, dan jalur utamanya tetap pull_request_target di atas.
@@ -40,6 +44,8 @@ permissions:
 jobs:
   jaga:
     runs-on: ubuntu-latest
+    # Tanpa batas waktu, satu panggilan gh yang menggantung menahan seluruh jalur.
+    timeout-minutes: 10
     steps:
       # Tanpa `ref`, checkout memakai branch tujuan untuk pull_request_target. Itu
       # yang diinginkan: skrip penjaga dan validator harus versi main, bukan versi PR.
