@@ -70,11 +70,16 @@ komentar_ganti() {
   # Kalau isinya sama persis dengan yang sudah ada, jangan diapa-apakan. Sapuan
   # berjalan tiap sepuluh menit; menghapus lalu menulis ulang komentar yang sama
   # berarti mengirim pemberitahuan baru ke pengklaim terus-menerus.
+  #
+  # Yang dibersihkan adalah SELURUH komentar bot yang bukan pemberitahuan merge,
+  # bukan hanya yang bertanda. Komentar panduan lama dari versi skrip sebelumnya
+  # tidak punya tanda, dan salah satunya sempat tertinggal sambil berbunyi "Validasi
+  # gagal, jadi PR ini ditutup" padahal PR-nya dibiarkan terbuka.
   lama=$(gh api "repos/$REPO/issues/$nomor/comments" --paginate \
-    --jq '.[] | select(.body | test("jaga-pr:(ditolak|ganda|tinjau)")) | .body' 2>/dev/null)
+    --jq '.[] | select((.user.login | startswith("github-actions"))) | select(.body | contains("di-merge otomatis") | not) | .body' 2>/dev/null)
   if [ "$lama" = "$isi" ]; then return 0; fi
   gh api "repos/$REPO/issues/$nomor/comments" --paginate \
-    --jq '.[] | select(.body | test("jaga-pr:(ditolak|ganda|tinjau)")) | .id' 2>/dev/null |
+    --jq '.[] | select((.user.login | startswith("github-actions"))) | select(.body | contains("di-merge otomatis") | not) | .id' 2>/dev/null |
     while read -r id; do
       [ -n "$id" ] && gh api -X DELETE "repos/$REPO/issues/comments/$id" >/dev/null 2>&1
     done
