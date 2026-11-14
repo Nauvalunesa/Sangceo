@@ -98,12 +98,20 @@ for n in "${DAFTAR[@]}"; do
   # 2. Periksa berkas dan kepemilikan.
   BOLEH=1
   SEBAB=""
+  # 1 = tutup PR, 0 = biarkan terbuka supaya bisa diperbaiki di tempat.
+  #
+  # Salah ketik `owner` pada berkas BARU adalah kesalahan yang paling sering terjadi
+  # (alamat `rahardiyan` tetapi akun GitHub-nya `ryhardiyan`) dan bisa diperbaiki tanpa
+  # membuka PR baru. Menutupnya memaksa orang mengulang dari awal untuk satu huruf.
+  # Sebaliknya, mengubah `owner` pada berkas yang SUDAH ada adalah percobaan mengambil
+  # alih klaim, dan itu tetap ditutup.
+  TUTUP=0
   HAPUS=0
   BERUBAH=$(git diff --name-only "$MB" "$HEAD_SHA")
   for f in $BERUBAH; do
     case "$f" in
       data/domains/*.json|data/emails/*.json) ;;
-      *) BOLEH=0; SEBAB="ada berkas di luar data/: $f"; continue ;;
+      *) BOLEH=0; TUTUP=1; SEBAB="ada berkas di luar data/: $f"; continue ;;
     esac
     if [ ! -f "$f" ]; then
       # Berkas dihapus. Ini boleh kalau pemiliknya sendiri yang menghapus, dan
@@ -111,40 +119,47 @@ for n in "${DAFTAR[@]}"; do
       # PR, karena menghapus akun email tidak bisa dikembalikan.
       case "$f" in
         data/emails/*)
-          BOLEH=0; SEBAB="berkas mailbox $f tidak boleh dihapus lewat PR"
+          BOLEH=0; TUTUP=1; SEBAB="berkas mailbox $f tidak boleh dihapus lewat PR"
           continue
           ;;
       esac
       LAMA_HAPUS=$(git show "$BASE:$f" 2>/dev/null || true)
       if [ -z "$LAMA_HAPUS" ]; then
-        BOLEH=0; SEBAB="berkas $f dihapus, padahal tidak ada di main"; continue
+        BOLEH=0; TUTUP=1; SEBAB="berkas $f dihapus, padahal tidak ada di main"; continue
       fi
       OWNER_HAPUS=$(echo "$LAMA_HAPUS" | jq -r '.owner // ""' 2>/dev/null)
       # Owner kosong atau gagal dibaca berarti tidak bisa dipastikan pemiliknya.
       # Tanpa pagar ini, penulis PR yang namanya juga kosong akan lolos.
       if [ -z "$OWNER_HAPUS" ] || [ -z "$AUTHOR" ]; then
-        BOLEH=0; SEBAB="pemilik $f tidak bisa dipastikan, penghapusan ditolak"
+        BOLEH=0; TUTUP=1; SEBAB="pemilik $f tidak bisa dipastikan, penghapusan ditolak"
         continue
       fi
       if [ "$(echo "$OWNER_HAPUS" | tr '[:upper:]' '[:lower:]')" != "$(echo "$AUTHOR" | tr '[:upper:]' '[:lower:]')" ]; then
-        BOLEH=0; SEBAB="berkas $f milik $OWNER_HAPUS, bukan $AUTHOR"
+        BOLEH=0; TUTUP=1; SEBAB="berkas $f milik $OWNER_HAPUS, bukan $AUTHOR"
       fi
       HAPUS=1
       continue
     fi
     OWNER=$(jq -r '.owner // ""' "$f" 2>/dev/null)
     if [ -z "$OWNER" ] || [ -z "$AUTHOR" ]; then
-      BOLEH=0; SEBAB="pemilik $f tidak bisa dipastikan, perubahan ditolak"; continue
+      BOLEH=0; TUTUP=1; SEBAB="pemilik $f tidak bisa dipastikan, perubahan ditolak"; continue
     fi
     if [ "$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')" != "$(echo "$AUTHOR" | tr '[:upper:]' '[:lower:]')" ]; then
-      BOLEH=0; SEBAB="berkas $f tercatat atas nama $OWNER, bukan $AUTHOR"; continue
+      # Berkas baru dengan owner salah ketik: bisa diperbaiki di tempat, jangan ditutup.
+      if git cat-file -e "$BASE:$f" 2>/dev/null; then
+        BOLEH=0; TUTUP=1; SEBAB="berkas $f tercatat atas nama $OWNER, bukan $AUTHOR"
+      else
+        BOLEH=0; TUTUP=0
+        SEBAB="berkas $f menulis \`owner\` = \`$OWNER\`, sedangkan akun yang membuka pull request ini adalah \`$AUTHOR\`. Ganti menjadi \`$AUTHOR\`, lalu simpan; penjaga akan memeriksa ulang sendiri."
+      fi
+      continue
     fi
     LAMA=$(git show "$BASE:$f" 2>/dev/null || true)
     if [ -n "$LAMA" ]; then
       for k in $BEKU; do
         a=$(echo "$LAMA" | jq -r --arg k "$k" '.[$k] // ""')
         b=$(jq -r --arg k "$k" '.[$k] // ""' "$f")
-        if [ "$a" != "$b" ]; then BOLEH=0; SEBAB="field $k pada $f berubah ($a -> $b)"; fi
+        if [ "$a" != "$b" ]; then BOLEH=0; TUTUP=1; SEBAB="field $k pada $f berubah ($a -> $b)"; fi
       done
     fi
   done
@@ -183,9 +198,14 @@ Kalau yang kamu maksud sebenarnya **mengubah** klaim yang sudah ada, gunakan hal
 
   if [ "$BOLEH" -eq 0 ]; then
     echo "    ditolak: $SEBAB"
+    if [ "$TUTUP" -eq 1 ]; then
+      AKHIR="Pull request ini ditutup dan perubahannya tidak akan aktif. Kalau salah satu poin di atas tidak jelas, tulis di issue."
+    else
+      AKHIR="Pull request ini **dibiarkan terbuka**. Perbaiki berkasnya di sini, jangan tutup dan buka ulang; penjaga memeriksa ulang otomatis setiap kali kamu menyimpan. Begitu lolos, pull request ini di-merge sendiri."
+    fi
     if ! sudah_komentar "$n" "$MARK_DITOLAK"; then
       komentar "$n" "$MARK_DITOLAK
-PR ini ditolak: $SEBAB
+Ada yang perlu diperbaiki: $SEBAB
 
 Aturannya sederhana: yang boleh mengubah isi berkas klaim hanya akun GitHub yang tercatat sebagai \`owner\` di berkas itu. Ini yang mencegah orang lain mengambil alih klaim bukan miliknya.
 
@@ -193,11 +213,9 @@ Catatan soal menghapus klaim:
 - Boleh menghapus klaim **subdomain** milikmu sendiri. Berkasnya hilang dari main, dan record DNS-nya ikut dibersihkan oleh sinkronisasi.
 - Berkas **mailbox tidak boleh dihapus lewat PR**, karena menghapus akun email tidak bisa dikembalikan. Ajukan lewat issue kalau memang perlu.
 
-Kalau kamu memang pemiliknya tetapi memakai akun berbeda, kirim ulang dari akun yang sama dengan \`owner\`. Kalau \`owner\` di berkas itu salah catat, tulis di issue supaya dibetulkan pemelihara.
-
-PR ini ditutup dan perubahan di dalamnya tidak akan pernah aktif. Kalau salah satu poin di atas tidak jelas, tulis di issue."
+$AKHIR"
     fi
-    gh pr close "$n" >/dev/null 2>&1 || true
+    [ "$TUTUP" -eq 1 ] && gh pr close "$n" >/dev/null 2>&1
     continue
   fi
 
