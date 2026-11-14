@@ -27,6 +27,7 @@
 set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
+REPO="${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)}"
 BEKU="domain subdomain owner address"
 # Penanda ditulis di komentar bot. Dipakai untuk memastikan bot tidak berkomentar
 # berulang kali, TETAPI tetap menulis ulang bila pesannya sudah tidak sesuai lagi.
@@ -43,6 +44,23 @@ komentar() { gh pr comment "$1" --body "$2" >/dev/null 2>&1 || true; }
 
 sudah_komentar() {
   gh pr view "$1" --json comments -q '.comments[].body' 2>/dev/null | grep -qF "$2"
+}
+
+# Menulis satu komentar penjelasan, menggantikan yang lama.
+#
+# Komentar bot hanya berguna kalau isinya sesuai keadaan sekarang. Pernah terjadi
+# pesan lama tertinggal dan tetap berbunyi "pull request ini ditutup" padahal PR-nya
+# dibiarkan terbuka, jadi pembacanya mengejar masalah yang sudah tidak ada. Sekarang
+# komentar bot yang bertanda jaga-pr dihapus dulu, lalu ditulis yang baru.
+komentar_ganti() {
+  nomor=$1
+  isi=$2
+  gh api "repos/$REPO/issues/$nomor/comments" --paginate \
+    --jq '.[] | select(.body | test("jaga-pr:(ditolak|ganda|tinjau)")) | .id' 2>/dev/null |
+    while read -r id; do
+      [ -n "$id" ] && gh api -X DELETE "repos/$REPO/issues/comments/$id" >/dev/null 2>&1
+    done
+  gh pr comment "$nomor" --body "$isi" >/dev/null 2>&1 || true
 }
 
 # Akun palsu atau yang sudah dihapus tidak boleh lolos hanya karena namanya sama
@@ -184,27 +202,24 @@ for n in "${DAFTAR[@]}"; do
 
   if [ -n "$GANDA" ]; then
     echo "    klaim $GANDA sudah ada di main, PR ditutup sebagai klaim ganda"
-    if ! sudah_komentar "$n" "$MARK_GANDA"; then
-      komentar "$n" "$MARK_GANDA
+    komentar_ganti "$n" "$MARK_GANDA
 Klaim \`$GANDA\` sudah aktif di main atas namamu, jadi pull request ini ditutup tanpa merge.
 
 Ini biasanya terjadi karena tombol klaim ditekan dua kali, atau karena pull request sebelumnya sudah masuk tetapi halamannya belum dimuat ulang. Tidak ada yang perlu diperbaiki: subdomain dan mailbox-mu sudah jalan.
 
 Kalau yang kamu maksud sebenarnya **mengubah** klaim yang sudah ada, gunakan halaman kelola di <https://sang.ceo/kelola>, bukan membuat berkas baru."
-    fi
     gh pr close "$n" >/dev/null 2>&1 || true
     continue
   fi
 
   if [ "$BOLEH" -eq 0 ]; then
-    echo "    ditolak: $SEBAB"
+    echo "    perlu diperbaiki: $SEBAB"
     if [ "$TUTUP" -eq 1 ]; then
       AKHIR="Pull request ini ditutup dan perubahannya tidak akan aktif. Kalau salah satu poin di atas tidak jelas, tulis di issue."
     else
       AKHIR="Pull request ini **dibiarkan terbuka**. Perbaiki berkasnya di sini, jangan tutup dan buka ulang; penjaga memeriksa ulang otomatis setiap kali kamu menyimpan. Begitu lolos, pull request ini di-merge sendiri."
     fi
-    if ! sudah_komentar "$n" "$MARK_DITOLAK"; then
-      komentar "$n" "$MARK_DITOLAK
+    komentar_ganti "$n" "$MARK_DITOLAK
 Ada yang perlu diperbaiki: $SEBAB
 
 Aturannya sederhana: yang boleh mengubah isi berkas klaim hanya akun GitHub yang tercatat sebagai \`owner\` di berkas itu. Ini yang mencegah orang lain mengambil alih klaim bukan miliknya.
@@ -214,7 +229,6 @@ Catatan soal menghapus klaim:
 - Berkas **mailbox tidak boleh dihapus lewat PR**, karena menghapus akun email tidak bisa dikembalikan. Ajukan lewat issue kalau memang perlu.
 
 $AKHIR"
-    fi
     [ "$TUTUP" -eq 1 ] && gh pr close "$n" >/dev/null 2>&1
     continue
   fi
