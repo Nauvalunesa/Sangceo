@@ -269,6 +269,11 @@ Klik **Ready for review** di halaman ini. Setelah itu penjaga memeriksa dan merg
     ada_pr "$f" || continue
     LAMA=$(git show "$BASE:$f" 2>/dev/null || true)
     [ -n "$LAMA" ] || continue
+    # Kalau berkas itu sudah ada sejak PR bercabang, PR ini sedang MENGUBAH klaim
+    # yang memang sudah ada, dan itu jalur yang sah: halaman kelola bekerja persis
+    # dengan cara ini. Dulu pemeriksaan di bawah menutupnya sebagai "klaim ganda",
+    # sehingga setiap perubahan record ditolak sebelum sempat sampai ke DNS.
+    git cat-file -e "$MB:$f" 2>/dev/null && continue
     SUB_BARU=$(isi_pr "$f" | jq -r '.subdomain // .address // ""' 2>/dev/null)
     SUB_LAMA=$(echo "$LAMA" | jq -r '.subdomain // .address // ""' 2>/dev/null)
     OWNER_LAMA=$(echo "$LAMA" | jq -r '.owner // ""' 2>/dev/null)
@@ -324,6 +329,10 @@ $AKHIR"
     ada_pr "$f" || continue
     ADA_SEKARANG=$(git show "$BASE:$f" 2>/dev/null || true)
     [ -n "$ADA_SEKARANG" ] || continue
+    # Sama seperti di atas: berkas yang sudah ada sejak PR bercabang sedang diubah,
+    # bukan diklaim ulang. Tanpa pengecualian ini, pemeriksaan benturan menutup
+    # setiap PR perubahan record tepat sebelum merge.
+    git cat-file -e "$MB:$f" 2>/dev/null && continue
     OWNER_SEKARANG=$(echo "$ADA_SEKARANG" | jq -r '.owner // ""' 2>/dev/null)
     NAMA_SEKARANG=$(echo "$ADA_SEKARANG" | jq -r '.subdomain // .address // ""' 2>/dev/null)
     BENTUR="$NAMA_SEKARANG"
