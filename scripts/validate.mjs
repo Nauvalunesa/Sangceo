@@ -6,9 +6,21 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 
 const BASE = process.argv[2]; // contoh: origin/main
+// Commit yang diperiksa. Dulu selalu HEAD, dan itu memaksa pemanggil menyamakan pohon
+// kerja dengan isi PR lebih dulu. Pohon kerja yang diubah-ubah itulah yang bikin
+// masalah: berkas yang tercatat berubah bisa saja sudah tidak ada di cakram, dan
+// validator lalu melaporkan "bukan JSON valid (ENOENT)" untuk klaim yang sebenarnya
+// baik-baik saja. Sekarang isinya dibaca langsung dari commit PR lewat `git show`,
+// sehingga tidak ada lagi selisih antara yang diperiksa dan yang tersimpan.
+const PR = process.argv[3] || "HEAD";
 const ZONE = "sang.ceo";
 
-const changedAll = execSync(`git diff --name-only --diff-filter=ACM ${BASE}...HEAD`, {
+// Membaca isi berkas pada commit PR, bukan pada pohon kerja.
+function isiBerkas(rel) {
+  return execSync(`git show ${PR}:${rel}`, { encoding: "utf8", maxBuffer: 8 << 20 });
+}
+
+const changedAll = execSync(`git diff --name-only --diff-filter=ACM ${BASE}...${PR}`, {
   encoding: "utf8",
 })
   .split("\n")
@@ -141,7 +153,7 @@ for (const file of changed) {
   const rel = file;
   let data;
   try {
-    data = JSON.parse(fs.readFileSync(rel, "utf8"));
+    data = JSON.parse(isiBerkas(rel));
   } catch (e) {
     errors.push(`\`${rel}\`: bukan JSON valid (${e.message})`);
     continue;
@@ -334,7 +346,7 @@ const BATAS_SUBDOMAIN = 3;
 {
   const bacaIsi = (rel) => {
     try {
-      return JSON.parse(fs.readFileSync(rel, "utf8"));
+      return JSON.parse(isiBerkas(rel));
     } catch {
       return null;
     }

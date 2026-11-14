@@ -30,9 +30,9 @@
 #      scripts/jaga-pr.sh bisa menjalankan perintah apa pun dengan izin itu. Diuji
 #      langsung: menyisipkan satu baris ke berkas yang sedang berjalan memang membuat
 #      baris itu ikut dieksekusi.
-#   2. Hanya data/ yang diambil dari PR, lewat `git checkout <sha> -- data`. Kode dari
-#      fork tidak pernah masuk ke pohon kerja, sehingga tidak ada skrip fork yang bisa
-#      terpanggil dan tidak ada berkas repo yang tertimpa.
+#   2. Pohon kerja tidak pernah disentuh. Isi berkas PR dibaca langsung dari commit
+#      lewat `git show`, jadi kode fork tidak pernah masuk ke cakram: tidak ada skrip
+#      fork yang bisa terpanggil dan tidak ada berkas repo yang bisa tertimpa.
 #   3. Validator diambil dari branch tujuan (`git show $BASE:scripts/validate.mjs`),
 #      tidak pernah dari fork, supaya PR tidak bisa melunakkan aturannya sendiri.
 #   4. Berkas dari PR hanya dibaca sebagai JSON, tidak pernah dijalankan.
@@ -67,6 +67,12 @@ sudah_komentar() {
 komentar_ganti() {
   nomor=$1
   isi=$2
+  # Kalau isinya sama persis dengan yang sudah ada, jangan diapa-apakan. Sapuan
+  # berjalan tiap sepuluh menit; menghapus lalu menulis ulang komentar yang sama
+  # berarti mengirim pemberitahuan baru ke pengklaim terus-menerus.
+  lama=$(gh api "repos/$REPO/issues/$nomor/comments" --paginate \
+    --jq '.[] | select(.body | test("jaga-pr:(ditolak|ganda|tinjau)")) | .body' 2>/dev/null)
+  if [ "$lama" = "$isi" ]; then return 0; fi
   gh api "repos/$REPO/issues/$nomor/comments" --paginate \
     --jq '.[] | select(.body | test("jaga-pr:(ditolak|ganda|tinjau)")) | .id' 2>/dev/null |
     while read -r id; do
@@ -110,24 +116,20 @@ for n in "${DAFTAR[@]}"; do
   HEAD_SHA=$(git rev-parse FETCH_HEAD)
   MB=$(git merge-base "$BASE" "$HEAD_SHA")
 
-  # Hanya data/ yang diambil dari PR. Kalau seluruh pohon di-checkout, scripts/jaga-pr.sh
-  # di cakram ikut berganti dengan versi fork selagi skrip ini masih dibaca bash.
-  rm -rf data
-  if ! git checkout -q "$HEAD_SHA" -- data 2>/dev/null; then
-    mkdir -p data
-  fi
+  # Pohon kerja TIDAK disentuh sama sekali. Isi berkas PR dibaca langsung dari commit
+  # lewat `git show`, jadi kode fork tidak pernah masuk ke cakram dan tidak ada berkas
+  # repo yang bisa tertimpa.
 
   # 1. Validasi memakai skrip versi main, bukan versi dari PR.
   git show "$BASE:scripts/validate.mjs" > /tmp/validate.mjs 2>/dev/null || exit 0
-  if ! node /tmp/validate.mjs "$MB" > /tmp/validate.log 2>&1; then
-    echo "    validasi gagal, PR ditutup"
+  if ! node /tmp/validate.mjs "$MB" "$HEAD_SHA" > /tmp/validate.log 2>&1; then
+    echo "    validasi gagal, PR dibiarkan terbuka untuk diperbaiki"
     {
       cat /tmp/validate.log
       echo
-      echo "Validasi gagal, jadi PR ini ditutup otomatis. Perbaiki berkasnya sesuai catatan di atas, lalu buka PR baru. Perubahan tidak akan pernah aktif lewat PR ini."
+      echo "Ada yang perlu diperbaiki. Pull request ini **dibiarkan terbuka**: perbaiki berkasnya di sini, jangan tutup dan buka ulang. Penjaga memeriksa ulang otomatis setiap kali kamu menyimpan, dan begitu lolos, pull request ini di-merge sendiri."
     } > /tmp/balasan.md
-    komentar "$n" "$(cat /tmp/balasan.md)"
-    gh pr close "$n" >/dev/null 2>&1 || true
+    komentar_ganti "$n" "$(cat /tmp/balasan.md)"
     continue
   fi
 
@@ -261,7 +263,4 @@ $AKHIR"
   fi
 done
 
-# Pulihkan data/ ke keadaan main supaya tidak ada sisa berkas PR tertinggal.
-rm -rf data
-git checkout -q "$BASE" -- data 2>/dev/null || mkdir -p data
 echo "Selesai."
