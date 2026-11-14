@@ -65,6 +65,18 @@ sudah_komentar() {
 # pesan lama tertinggal dan tetap berbunyi "pull request ini ditutup" padahal PR-nya
 # dibiarkan terbuka, jadi pembacanya mengejar masalah yang sudah tidak ada. Sekarang
 # komentar bot yang bertanda jaga-pr dihapus dulu, lalu ditulis yang baru.
+# Buang seluruh komentar bot yang bertanda, tanpa menggantinya. Dipakai tepat sebelum
+# pemberitahuan merge: pemberitahuan itu tidak bertanda (dan dibiarkan menetap), jadi
+# tanpa langkah ini komentar "masih draft" atau "perlu diperbaiki" akan tertinggal
+# berdampingan dengan kabar bahwa PR-nya justru sudah merge.
+bersihkan_penanda() {
+  gh api "repos/$REPO/issues/$1/comments" --paginate \
+    --jq '.[] | select((.user.login | startswith("github-actions"))) | select(.body | contains("<!-- jaga-pr:")) | .id' 2>/dev/null |
+    while read -r id; do
+      [ -n "$id" ] && gh api -X DELETE "repos/$REPO/issues/comments/$id" >/dev/null 2>&1
+    done
+}
+
 komentar_ganti() {
   nomor=$1
   isi=$2
@@ -344,6 +356,7 @@ Satu nama hanya boleh satu pemilik. Pilih nama lain lewat <https://sang.ceo/daft
   if gh pr merge "$n" --squash >/dev/null 2>&1 || gh pr merge "$n" --squash --admin >/dev/null 2>&1; then
     SHA=$(gh pr view "$n" --json mergeCommit -q '.mergeCommit.oid[0:7]' 2>/dev/null)
     echo "    di-merge otomatis ($SHA)"
+    bersihkan_penanda "$n"
     komentar "$n" "Validasi lolos dan berkas yang berubah tercatat atas namamu, jadi PR ini di-merge otomatis ($SHA). Perubahan aktif setelah sinkronisasi berikutnya."
   else
     GALAT=$(gh pr merge "$n" --squash 2>&1 | head -3 | tr '\n' ' ')
