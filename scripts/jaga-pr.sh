@@ -127,6 +127,8 @@ for n in "${DAFTAR[@]}"; do
 
   # 1. Validasi memakai skrip versi main, bukan versi dari PR.
   git show "$BASE:scripts/validate.mjs" > /tmp/validate.mjs 2>/dev/null || exit 0
+  echo "    base=$BASE mb=$MB head=$HEAD_SHA"
+  echo "    berubah: $(git diff --name-only --diff-filter=ACM "$MB...$HEAD_SHA" | tr '\n' ' ')"
   if ! node /tmp/validate.mjs "$MB" "$HEAD_SHA" > /tmp/validate.log 2>&1; then
     echo "    validasi gagal, PR dibiarkan terbuka untuk diperbaiki"
     {
