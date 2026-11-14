@@ -195,9 +195,26 @@ email yang tidak keberatan dipublikasi, atau login dulu di sang.ceo pakai GitHub
 agar sandi dikirim ke email terverifikasi tanpa perlu menuliskannya di file.
 Jatah mailbox gratis terbatas 3 akun untuk seluruh zona.
 
+## Beberapa hal yang paling sering membuat PR ditolak
+
+Semuanya bisa diperbaiki langsung di pull request yang sama. Tidak perlu menutup lalu
+membuka yang baru: penjaga memeriksa ulang otomatis setiap kali kamu menyimpan.
+
+1. **Nama berkas harus sama dengan isinya.** `data/domains/budi.sang.ceo.json` harus
+   berisi `"subdomain": "budi"`, dan `data/emails/budi.json` harus berisi
+   `"address": "budi"`. Kalau berbeda, berkasnya tidak dianggap milik siapa pun.
+2. **`owner` harus akun GitHub yang membuka pull request.** Menulis nama panggilan di
+   situ adalah kesalahan yang paling sering terjadi, dan akibatnya PR ditolak.
+3. **Nama yang dipakai sistem tidak bisa diklaim.** `www`, `mail`, `webmail`,
+   `autoconfig`, `autodiscover`, `mx1`, `admin`, `abuse`, dan sejenisnya. Halaman
+   generator sudah menolaknya lebih dulu, jadi cukup ikuti yang tersedia di sana.
+4. **Satu nama hanya boleh satu berkas.** Klaim ganda otomatis ditutup sebagai klaim
+   ganda, dan yang kedua tidak akan pernah merge.
+
 ## Aturan singkat
 
 1. Satu subdomain / alamat per orang per keperluan. Tidak ada penimbunan.
 2. Jangan klaim nama milik orang lain atau merek dagang pihak lain.
 3. Konten ilegal (phishing, malware, penipuan) dihapus tanpa pemberitahuan.
-4. Bot menutup otomatis PR yang filenya salah format.
+4. Bot menolak otomatis PR yang filenya salah format, salah nama berkas, atau memakai
+   nama yang dicadangkan. PR-nya dibiarkan terbuka supaya bisa diperbaiki di tempat.
