@@ -1,0 +1,15 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "rahardiyan",
+  "owner": "ryhardiyan",
+  "records": {
+    "CNAME": "2e86b318bc4a98b6.vercel-dns-017.com"
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=rahardiyan.sang.ceo,fca8880962aaf932f01c"
+    }
+  ]
+}
