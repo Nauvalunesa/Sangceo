@@ -9,7 +9,8 @@
     {
       "type": "TXT",
       "name": "_vercel",
-      "value": "vc-domain-verify=elkaff.sang.ceo,46fd4513a4a4bff65b6b"
+      "value": "vc-domain-verify=elkaff.sang.ceo,46fd4513a4a4bff65b6b",
+      "at": "apex"
     }
   ]
 }

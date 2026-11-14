@@ -9,7 +9,8 @@
     {
       "type": "TXT",
       "name": "_vercel",
-      "value": "vc-domain-verify=yannrzy.sang.ceo,c4d157183c883813d713"
+      "value": "vc-domain-verify=yannrzy.sang.ceo,c4d157183c883813d713",
+      "at": "apex"
     }
   ],
   "proxy": true

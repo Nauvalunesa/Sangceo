@@ -46,6 +46,7 @@ BEKU="domain subdomain owner address"
 # Penanda beda untuk tiap sebab, jadi perubahan aturan tidak meninggalkan pesan basi.
 MARK_DITOLAK="<!-- jaga-pr:ditolak -->"
 MARK_TINJAU="<!-- jaga-pr:tinjau -->"
+MARK_DRAF="<!-- jaga-pr:draf -->"
 MARK_GANDA="<!-- jaga-pr:ganda -->"
 
 git config --global --add safe.directory "$PWD" 2>/dev/null || true
@@ -119,8 +120,22 @@ PEMILIK_REPO=$(gh repo view --json owner -q .owner.login 2>/dev/null)
 echo "PR terbuka: ${#DAFTAR[@]} (pemelihara: ${PEMILIK_REPO:-tidak diketahui})"
 
 for n in "${DAFTAR[@]}"; do
+  # Ambil main sekali lagi di setiap PR. Satu PR bisa mendarat selagi PR lain
+  # diperiksa, dan pemeriksaan yang memakai main lama akan meloloskan klaim ganda.
+  if git fetch -q origin main 2>/dev/null; then BASE=$(git rev-parse origin/main); fi
+
   INFO=$(gh pr view "$n" --json isDraft,author,headRefName,headRepositoryOwner 2>/dev/null) || continue
-  [ "$(echo "$INFO" | jq -r '.isDraft')" = "true" ] && continue
+  if [ "$(echo "$INFO" | jq -r '.isDraft')" = "true" ]; then
+    # Dulu draft dilewati tanpa sepatah kata. Kontributor yang membuka draft lalu
+    # menandainya siap dinilai tidak memicu pemeriksaan apa pun, dan PR-nya diam
+    # sampai sapuan terjadwal berikutnya, yang bisa berjam-jam kemudian.
+    echo "    masih draft, diberi tahu"
+    komentar_ganti "$n" "$MARK_DRAF
+Pull request ini masih **draft**, jadi belum diperiksa dan belum bisa di-merge otomatis.
+
+Klik **Ready for review** di halaman ini. Setelah itu penjaga memeriksa dan mergenya sendiri, biasanya dalam hitungan detik. Tidak perlu menutup dan membuka ulang."
+    continue
+  fi
   AUTHOR=$(echo "$INFO" | jq -r '.author.login')
   TRUSTED=0
   if [ -n "$PEMILIK_REPO" ] && [ "$(echo "$AUTHOR" | tr '[:upper:]' '[:lower:]')" = "$(echo "$PEMILIK_REPO" | tr '[:upper:]' '[:lower:]')" ]; then
@@ -284,13 +299,66 @@ $AKHIR"
     continue
   fi
 
-  # 3. Semua aman, merge.
+  # 3. Semua aman. Ambil main sekali lagi tepat sebelum merge.
+  #
+  # Pemeriksaan di atas memakai main yang diambil beberapa detik sebelumnya. Kalau PR
+  # lain untuk nama yang sama mendarat di sela itu, merge-nya berakhir sebagai
+  # add/add conflict dan pesan galatnya tidak menjelaskan apa pun. Diperiksa ulang di
+  # sini supaya jendelanya tinggal sepersekian detik, bukan sepanjang pemeriksaan.
+  if git fetch -q origin main 2>/dev/null; then BASE=$(git rev-parse origin/main); fi
+  BENTUR=""
+  for f in $BERUBAH; do
+    case "$f" in data/domains/*.json|data/emails/*.json) ;; *) continue ;; esac
+    ada_pr "$f" || continue
+    ADA_SEKARANG=$(git show "$BASE:$f" 2>/dev/null || true)
+    [ -n "$ADA_SEKARANG" ] || continue
+    OWNER_SEKARANG=$(echo "$ADA_SEKARANG" | jq -r '.owner // ""' 2>/dev/null)
+    NAMA_SEKARANG=$(echo "$ADA_SEKARANG" | jq -r '.subdomain // .address // ""' 2>/dev/null)
+    BENTUR="$NAMA_SEKARANG"
+    if [ "$TRUSTED" -eq 0 ] && [ "$(echo "$OWNER_SEKARANG" | tr '[:upper:]' '[:lower:]')" != "$(echo "$AUTHOR" | tr '[:upper:]' '[:lower:]')" ]; then
+      BENTUR="$NAMA_SEKARANG|$OWNER_SEKARANG"
+    fi
+    break
+  done
+
+  if [ -n "$BENTUR" ]; then
+    NAMA_BENTUR=${BENTUR%%|*}
+    PEMILIK_BENTUR=${BENTUR#*|}
+    [ "$PEMILIK_BENTUR" = "$BENTUR" ] && PEMILIK_BENTUR=""
+    echo "    nama $NAMA_BENTUR baru saja diklaim, PR tidak di-merge"
+    if [ -z "$PEMILIK_BENTUR" ]; then
+      komentar_ganti "$n" "$MARK_GANDA
+Klaim \`$NAMA_BENTUR\` baru saja masuk ke main selagi pull request ini diperiksa, jadi pull request ini ditutup tanpa merge.
+
+Klaim itu atas namamu sendiri, jadi tidak ada yang perlu diperbaiki: subdomain dan mailbox-mu sudah jalan. Halaman kelola di <https://sang.ceo/kelola> dipakai untuk mengubah, bukan untuk menambah berkas baru."
+    else
+      komentar_ganti "$n" "$MARK_GANDA
+Klaim \`$NAMA_BENTUR\` baru saja masuk ke main atas nama \`$PEMILIK_BENTUR\`, jadi pull request ini ditutup tanpa merge.
+
+Satu nama hanya boleh satu pemilik. Pilih nama lain lewat <https://sang.ceo/daftar>."
+    fi
+    gh pr close "$n" >/dev/null 2>&1 || true
+    continue
+  fi
+
   if gh pr merge "$n" --squash >/dev/null 2>&1 || gh pr merge "$n" --squash --admin >/dev/null 2>&1; then
     SHA=$(gh pr view "$n" --json mergeCommit -q '.mergeCommit.oid[0:7]' 2>/dev/null)
     echo "    di-merge otomatis ($SHA)"
     komentar "$n" "Validasi lolos dan berkas yang berubah tercatat atas namamu, jadi PR ini di-merge otomatis ($SHA). Perubahan aktif setelah sinkronisasi berikutnya."
   else
-    echo "    merge gagal (mungkin sudah ditangani jalur lain)"
+    GALAT=$(gh pr merge "$n" --squash 2>&1 | head -3 | tr '\n' ' ')
+    echo "    merge gagal: $GALAT"
+    # Konflik hampir selalu berarti berkas yang sama baru diubah PR lain. PR dibiarkan
+    # terbuka: pemeriksaan berikutnya akan menemukan sebabnya, dan penulisnya tetap
+    # bisa memperbaiki. Menutupnya di sini akan menghapus pekerjaan yang masih sah.
+    komentar_ganti "$n" "$MARK_TINJAU
+Pull request ini lolos pemeriksaan, tetapi GitHub menolak merge-nya:
+
+\`\`\`
+$GALAT
+\`\`\`
+
+Biasanya ini berarti bagian yang sama baru diubah pull request lain. Pull request ini **dibiarkan terbuka** dan diperiksa ulang otomatis. Kalau kamu tahu berkasnya bentrok, perbaiki di sini."
   fi
 done
 

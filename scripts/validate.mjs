@@ -274,23 +274,32 @@ for (const file of changed) {
             errors.push(`${at}: \`name\` harus satu label huruf kecil/angka/tanda hubung, boleh diawali \`_\``);
           if (typeof x.value !== "string" || x.value.length === 0 || x.value.length > 500 || /[\r\n]/.test(x.value))
             errors.push(`${at}: \`value\` harus string 1-500 karakter tanpa baris baru`);
-          // Level zona tidak lagi boleh dipakai, dan alasannya bukan sekadar kerapian.
+          // Verifikasi Vercel memang di level zona, bukan di bawah subdomain.
           //
-          // Delapan klaim pernah menulis `at: "apex"` karena menyalin apa adanya dari
-          // Vercel, dan semuanya berakhir sebagai delapan nilai TXT pada satu nama
-          // `_vercel.sang.ceo`. Vercel tidak pernah membaca tempat itu: ia memeriksa
-          // `_vercel.<domain>`. Jadi kedelapan orang itu menunggu verifikasi yang tidak
-          // akan pernah datang, sementara di repo semuanya tampak beres.
+          // Ini sempat saya balik karena tampak lebih rapi di bawah nama masing-masing,
+          // dan itu salah. Buktinya dari Vercel sendiri: `partners.vercel.com` punya CNAME
+          // ke `945521042eb87955.vercel-dns-013.com` dan dilayani Vercel, tetapi TXT
+          // verifikasinya ada di `_vercel.vercel.com`, dengan nilai
+          // `vc-domain-verify=partners.vercel.com,...`. Di `_vercel.partners.vercel.com`
+          // tidak ada apa pun. Jadi untuk `ammar.sang.ceo`, tempatnya `_vercel.sang.ceo`.
           //
-          // Nama level zona juga bukan milik pengklaim. Yang boleh menulis di sana hanya
-          // pemilik zona; itu sudah diurus di luar registry.
-          if (x.at !== undefined)
-            errors.push(
-              `${at}: \`at\` tidak dipakai lagi, hapus baris itu. ` +
-                `Verifikasi diletakkan di bawah namamu sendiri: \`${x.name}.${subdomain}.${ZONE}\`. ` +
-                `Kalau Vercel menampilkan \`${x.name}.${ZONE}\`, berarti yang sedang diverifikasi ` +
-                `domain \`${ZONE}\` itu sendiri, bukan subdomainmu.`
-            );
+          // Karena satu nama dipakai bersama, isinya dibatasi: hanya `_vercel`, hanya
+          // token Vercel, dan tokennya wajib untuk subdomain pengklaim itu sendiri.
+          // Tanpa batas terakhir, siapa pun bisa menaruh token domain lain di zona ini.
+          if (x.at === "apex") {
+            if (x.name !== "_vercel")
+              errors.push(`${at}: \`at: "apex"\` hanya untuk \`name: "_vercel"\``);
+            const token = /^vc-domain-verify=([a-z0-9.-]+),[a-z0-9]+$/i.exec(String(x.value));
+            if (!token)
+              errors.push(`${at}: nilai level zona harus format Vercel \`vc-domain-verify=<domain>,<kode>\``);
+            else if (token[1].toLowerCase() !== `${subdomain}.${ZONE}`.toLowerCase())
+              errors.push(
+                `${at}: nilai itu memverifikasi \`${token[1]}\`, bukan \`${subdomain}.${ZONE}\`. ` +
+                  `Yang boleh dititipkan di zona ini hanya token untuk subdomainmu sendiri.`
+              );
+          } else if (x.at !== undefined) {
+            errors.push(`${at}: \`at\` hanya boleh "sub" (bawaan) atau "apex"`);
+          }
         });
       }
     }
