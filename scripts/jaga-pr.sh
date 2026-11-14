@@ -22,8 +22,20 @@
 # PullRequests: read". Dengan izin itu bot tidak bisa berkomentar, menutup, apalagi
 # merge, sehingga setiap PR dari kontributor baru menggantung tanpa penjelasan.
 #
-# Pagar keamanan: skrip ini TIDAK PERNAH menjalankan kode dari PR. Validator diambil
-# dari branch tujuan dan disalin ke /tmp. Berkas dari PR hanya dibaca sebagai JSON.
+# Pagar keamanan. Jangan pernah dilonggarkan:
+#   1. Skrip ini dijalankan dari SALINAN di /tmp, bukan dari dalam repo. Bash membaca
+#      skrip bertahap dari cakram selagi berjalan; kalau isi berkasnya diganti di
+#      tengah jalan, baris pengganti itu ikut dieksekusi. Pemicu pull_request_target
+#      membuat GH_TOKEN berizin tulis penuh, jadi fork yang menyunting
+#      scripts/jaga-pr.sh bisa menjalankan perintah apa pun dengan izin itu. Diuji
+#      langsung: menyisipkan satu baris ke berkas yang sedang berjalan memang membuat
+#      baris itu ikut dieksekusi.
+#   2. Hanya data/ yang diambil dari PR, lewat `git checkout <sha> -- data`. Kode dari
+#      fork tidak pernah masuk ke pohon kerja, sehingga tidak ada skrip fork yang bisa
+#      terpanggil dan tidak ada berkas repo yang tertimpa.
+#   3. Validator diambil dari branch tujuan (`git show $BASE:scripts/validate.mjs`),
+#      tidak pernah dari fork, supaya PR tidak bisa melunakkan aturannya sendiri.
+#   4. Berkas dari PR hanya dibaca sebagai JSON, tidak pernah dijalankan.
 set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
@@ -97,7 +109,13 @@ for n in "${DAFTAR[@]}"; do
   fi
   HEAD_SHA=$(git rev-parse FETCH_HEAD)
   MB=$(git merge-base "$BASE" "$HEAD_SHA")
-  git checkout -q --detach "$HEAD_SHA" 2>/dev/null || continue
+
+  # Hanya data/ yang diambil dari PR. Kalau seluruh pohon di-checkout, scripts/jaga-pr.sh
+  # di cakram ikut berganti dengan versi fork selagi skrip ini masih dibaca bash.
+  rm -rf data
+  if ! git checkout -q "$HEAD_SHA" -- data 2>/dev/null; then
+    mkdir -p data
+  fi
 
   # 1. Validasi memakai skrip versi main, bukan versi dari PR.
   git show "$BASE:scripts/validate.mjs" > /tmp/validate.mjs 2>/dev/null || exit 0
@@ -243,5 +261,7 @@ $AKHIR"
   fi
 done
 
-git checkout -q "$BASE" 2>/dev/null || git checkout -q main 2>/dev/null || true
+# Pulihkan data/ ke keadaan main supaya tidak ada sisa berkas PR tertinggal.
+rm -rf data
+git checkout -q "$BASE" -- data 2>/dev/null || mkdir -p data
 echo "Selesai."

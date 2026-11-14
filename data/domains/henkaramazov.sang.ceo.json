@@ -1,8 +1,0 @@
-{
-  "domain": "sang.ceo",
-  "subdomain": "henkaramazov",
-  "owner": "Henkarmazov",
-  "records": {
-    "CNAME": "henkaramazov.github.io"
-  }
-}

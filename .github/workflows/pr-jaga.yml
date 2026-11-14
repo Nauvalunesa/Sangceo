@@ -55,4 +55,10 @@ jobs:
           # Untuk pull_request_target, nomor PR diambil dari event. Untuk jadwal dan
           # manual, kosong, dan penjaga memeriksa semua PR terbuka.
           NOMOR_PR: ${{ github.event.pull_request.number }}
-        run: bash scripts/jaga-pr.sh
+        # Dijalankan dari SALINAN di /tmp, bukan dari dalam repo. Bash membaca skrip
+        # bertahap dari cakram selagi berjalan. Kalau penjaga mengambil seluruh pohon
+        # PR dengan checkout, scripts/jaga-pr.sh di cakram berganti dengan versi fork
+        # dan baris sisipannya ikut dieksekusi, dengan GH_TOKEN berizin tulis penuh.
+        run: |
+          cp scripts/jaga-pr.sh /tmp/jaga-pr.sh
+          bash /tmp/jaga-pr.sh
