@@ -86,6 +86,17 @@ komentar_ganti() {
   gh pr comment "$nomor" --body "$isi" >/dev/null 2>&1 || true
 }
 
+# Isi berkas pada commit PR. Pohon kerja tidak dipakai sama sekali, karena kode fork
+# tidak boleh masuk ke cakram: bash membaca skrip bertahap, dan GH_TOKEN di sini
+# berizin tulis penuh.
+isi_pr() {
+  git show "$HEAD_SHA:$1" 2>/dev/null
+}
+
+ada_pr() {
+  git cat-file -e "$HEAD_SHA:$1" 2>/dev/null
+}
+
 # Akun palsu atau yang sudah dihapus tidak boleh lolos hanya karena namanya sama
 # dengan yang tercatat sebagai owner.
 akun_ada() {
@@ -158,7 +169,7 @@ for n in "${DAFTAR[@]}"; do
       data/domains/*.json|data/emails/*.json) ;;
       *) BOLEH=0; TUTUP=1; SEBAB="ada berkas di luar data/: $f"; continue ;;
     esac
-    if [ ! -f "$f" ]; then
+    if ! ada_pr "$f"; then
       # Berkas dihapus. Ini boleh kalau pemiliknya sendiri yang menghapus, dan
       # hanya untuk berkas SUBDOMAIN. Berkas mailbox tidak boleh dihapus lewat
       # PR, karena menghapus akun email tidak bisa dikembalikan.
@@ -185,7 +196,7 @@ for n in "${DAFTAR[@]}"; do
       HAPUS=1
       continue
     fi
-    OWNER=$(jq -r '.owner // ""' "$f" 2>/dev/null)
+    OWNER=$(isi_pr "$f" | jq -r '.owner // ""' 2>/dev/null)
     if [ -z "$OWNER" ] || [ -z "$AUTHOR" ]; then
       BOLEH=0; TUTUP=1; SEBAB="pemilik $f tidak bisa dipastikan, perubahan ditolak"; continue
     fi
@@ -203,7 +214,7 @@ for n in "${DAFTAR[@]}"; do
     if [ -n "$LAMA" ]; then
       for k in $BEKU; do
         a=$(echo "$LAMA" | jq -r --arg k "$k" '.[$k] // ""')
-        b=$(jq -r --arg k "$k" '.[$k] // ""' "$f")
+        b=$(isi_pr "$f" | jq -r --arg k "$k" '.[$k] // ""')
         if [ "$a" != "$b" ]; then BOLEH=0; TUTUP=1; SEBAB="field $k pada $f berubah ($a -> $b)"; fi
       done
     fi
@@ -215,10 +226,10 @@ for n in "${DAFTAR[@]}"; do
   GANDA=""
   for f in $BERUBAH; do
     case "$f" in data/domains/*.json|data/emails/*.json) ;; *) continue ;; esac
-    [ -f "$f" ] || continue
+    ada_pr "$f" || continue
     LAMA=$(git show "$BASE:$f" 2>/dev/null || true)
     [ -n "$LAMA" ] || continue
-    SUB_BARU=$(jq -r '.subdomain // .address // ""' "$f" 2>/dev/null)
+    SUB_BARU=$(isi_pr "$f" | jq -r '.subdomain // .address // ""' 2>/dev/null)
     SUB_LAMA=$(echo "$LAMA" | jq -r '.subdomain // .address // ""' 2>/dev/null)
     OWNER_LAMA=$(echo "$LAMA" | jq -r '.owner // ""' 2>/dev/null)
     if [ "$SUB_BARU" = "$SUB_LAMA" ] && [ "$SUB_LAMA" != "" ] \
