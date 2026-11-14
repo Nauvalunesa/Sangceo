@@ -1,0 +1,8 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "razan",
+  "owner": "zannbjir",
+  "records": {
+    "CNAME": "razan-5re.pages.dev"
+  }
+}
