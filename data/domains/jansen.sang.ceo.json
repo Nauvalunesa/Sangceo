@@ -4,5 +4,13 @@
   "owner": "jansendoank",
   "records": {
     "CNAME": "cname.vercel-dns.com"
-  }
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=jansen.sang.ceo,ae25525977cedbbad24c",
+      "at": "apex"
+    }
+  ]
 }
