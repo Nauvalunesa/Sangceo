@@ -11,6 +11,11 @@
       "name": "_vercel",
       "value": "vc-domain-verify=zikri.sang.ceo,85594d90a71d9c0d7d44",
       "at": "apex"
+    },
+    {
+      "type": "TXT",
+      "name": "_verifikasi",
+      "value": "google-site-verification=pMzpdTkQeBFru5zCAHnwY3ghzBXHJhFdB5yLzoIgfSA"
     }
   ]
 }
