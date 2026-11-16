@@ -1,0 +1,8 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "ali",
+  "owner": "alphauz",
+  "records": {
+    "CNAME": "e1c2b260-c5ff-431d-901e-a5c986e79c37.cfargotunnel.com"
+  }
+}
