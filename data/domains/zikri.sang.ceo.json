@@ -4,5 +4,13 @@
   "owner": "0xrbc32",
   "records": {
     "A": "216.198.79.1"
-  }
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=zikri.sang.ceo,85594d90a71d9c0d7d44",
+      "at": "apex"
+    }
+  ]
 }
