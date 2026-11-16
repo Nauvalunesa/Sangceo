@@ -1,0 +1,8 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "api",
+  "owner": "jansendoank",
+  "records": {
+    "CNAME": "cname.vercel-dns.com"
+  }
+}
