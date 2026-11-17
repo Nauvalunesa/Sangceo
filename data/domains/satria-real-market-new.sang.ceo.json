@@ -1,0 +1,8 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "satria-real-market-new",
+  "owner": "satria30092012-png",
+  "records": {
+    "CNAME": "cname.vercel-dns.com"
+  }
+}
