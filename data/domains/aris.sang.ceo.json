@@ -1,0 +1,9 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "aris",
+  "owner": "Layzcmd",
+  "records": {
+    "TXT": "vc-domain-verify=sang.ceo,4bd028e5065287abd754"
+  },
+  "proxy": true
+}
