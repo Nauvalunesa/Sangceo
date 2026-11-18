@@ -1,0 +1,16 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "fort",
+  "owner": "vtxcommunity",
+  "records": {
+    "CNAME": "9dd1d588806f81e2.vercel-dns-017.com"
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=fort.sang.ceo,fca5b3afcce2d394ea92",
+      "at": "apex"
+    }
+  ]
+}
