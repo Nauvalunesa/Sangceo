@@ -1,0 +1,8 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "faro",
+  "owner": "programmerterkeren",
+  "records": {
+    "CNAME": "cname.vercel-dns.com"
+  }
+}
