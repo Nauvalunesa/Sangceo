@@ -12,5 +12,6 @@
       "value": "vc-domain-verify=fort.sang.ceo,fca5b3afcce2d394ea92",
       "at": "apex"
     }
-  ]
+  ],
+  "proxy": true
 }
