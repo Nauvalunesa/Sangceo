@@ -1,0 +1,8 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "kkat",
+  "owner": "kiuur",
+  "records": {
+    "CNAME": "waguri.caliphdev.com"
+  }
+}
