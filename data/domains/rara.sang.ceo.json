@@ -1,0 +1,9 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "rara",
+  "owner": "rarastudiocinematic",
+  "records": {
+    "CNAME": "a5d1d78b-6458-4ad9-91fb-5fa1e8c4d241.cfargotunnel.com"
+  },
+  "proxy": true
+}
