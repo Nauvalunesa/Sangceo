@@ -2,7 +2,18 @@
   "domain": "sang.ceo",
   "subdomain": "ilham",
   "owner": "HamzBotzzzzz",
+  "repo": "github.com/HamzBotzzzzz/Sangceo",
+  "description": "situs",
   "records": {
     "CNAME": "cname.vercel-dns.com"
-  }
+  },
+  "proxy": true,
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=ilham.sang.ceo,c40086e657f6269f8c53",
+      "at": "apex"
+    }
+  ]
 }
