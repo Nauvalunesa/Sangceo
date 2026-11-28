@@ -3,13 +3,13 @@
   "subdomain": "faroo",
   "owner": "tatanta61",
   "records": {
-    "CNAME": "0088d97b2362415b.vercel-dns-017.com"
+    "CNAME": "cname.vercel-dns.com"
   },
   "extra": [
     {
       "type": "TXT",
       "name": "_vercel",
-      "value": "vc-domain-verify=faroo.sang.ceo,bbbc89c0351efc476d7f"
+      "value": "vc-domain-verify=sang.ceo,25394bd9c98e9afd0726"
     }
   ]
 }
