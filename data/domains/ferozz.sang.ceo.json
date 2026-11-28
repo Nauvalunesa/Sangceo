@@ -10,6 +10,12 @@
       "type": "TXT",
       "name": "_vercel",
       "value": "vc-domain-verify=sang.ceo,25394bd9c98e9afd0726"
+    },
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=ferozz.sang.ceo,0fe54dad9ef8ef6b61e3",
+      "at": "apex"
     }
   ]
 }
