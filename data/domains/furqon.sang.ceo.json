@@ -1,0 +1,8 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "furqon",
+  "owner": "kanzzet",
+  "records": {
+    "CNAME": "kanzzet.github.io"
+  }
+}
