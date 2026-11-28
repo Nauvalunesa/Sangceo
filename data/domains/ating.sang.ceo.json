@@ -1,0 +1,15 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "ating",
+  "owner": "wtmsdrjt",
+  "records": {
+    "TXT": "cname.vercel-dns.com"
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=sang.ceo,cd56eefee8fa61b1abb9"
+    }
+  ]
+}
