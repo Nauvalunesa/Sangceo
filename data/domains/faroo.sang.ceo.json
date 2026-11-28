@@ -1,0 +1,16 @@
+{
+  "domain": "sang.ceo",
+  "subdomain": "faroo",
+  "owner": "tatanta61",
+  "records": {
+    "CNAME": "0088d97b2362415b.vercel-dns-017.com"
+  },
+  "extra": [
+    {
+      "type": "TXT",
+      "name": "_vercel",
+      "value": "vc-domain-verify=faroo.sang.ceo,bbbc89c0351efc476d7f",
+      "at": "apex"
+    }
+  ]
+}
